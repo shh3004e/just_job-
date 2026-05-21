@@ -1,0 +1,23 @@
+{
+  "name": "jj-just-job-root",
+  "version": "1.0.0",
+  "description": "Niche fresher design job portal - JJ Just Job",
+  "scripts": {
+    "install-server": "npm install --prefix server",
+    "install-client": "npm install --prefix client",
+    "install-all": "npm run install-server && npm run install-client",
+    "build-client": "npm run build --prefix client",
+    "start": "npm start --prefix server",
+    "server": "npm run dev --prefix server",
+    "client": "npm run dev --prefix client",
+    "build-and-run": "npm run build-client && npm run start"
+  },
+  "keywords": [
+    "job-portal",
+    "ui-ux",
+    "graphic-design",
+    "fresher"
+  ],
+  "author": "Suryansh",
+  "license": "ISC"
+}
