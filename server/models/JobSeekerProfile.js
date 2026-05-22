@@ -14,7 +14,7 @@ const JobSeekerProfileSchema = new mongoose.Schema({
   },
   position: {
     type: String,
-    enum: ['Graphic Designer', 'UI/UX Designer'],
+    enum: ['Graphic Designer', 'UI/UX Designer', 'Motion Graphic Designer'],
     required: [true, 'Please select your position']
   },
   experienceType: {

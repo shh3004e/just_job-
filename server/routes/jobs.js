@@ -3,12 +3,16 @@ const router = express.Router();
 const JobPost = require('../models/JobPost');
 const Application = require('../models/Application');
 const { protect, authorize } = require('../middleware/authMiddleware');
+const { cleanupJobs } = require('../utils/jobFetcher');
 
 // @desc    Get all open jobs
 // @route   GET /api/jobs
 // @access  Public (Seekers and anonymous guests can browse)
 router.get('/', async (req, res) => {
   try {
+    // Run cleanup in real-time before listing
+    await cleanupJobs();
+
     // Return open jobs, sort by newest
     const jobs = await JobPost.find({ status: 'open' }).sort({ createdAt: -1 });
     res.status(200).json({ success: true, count: jobs.length, data: jobs });
@@ -84,6 +88,12 @@ router.post('/', protect, authorize('recruiter'), async (req, res) => {
       }
     } else {
       return res.status(400).json({ success: false, message: 'Invalid experience type' });
+    }
+
+    // Role validation check (strictly Graphic Designer, UI/UX Designer, or Motion Graphic Designer)
+    const validRoles = ['Graphic Designer', 'UI/UX Designer', 'Motion Graphic Designer'];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({ success: false, message: 'Invalid role category. Must be one of: Graphic Designer, UI/UX Designer, or Motion Graphic Designer' });
     }
 
     // Create job post

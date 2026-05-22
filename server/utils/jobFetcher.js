@@ -20,14 +20,23 @@ const cleanupJobs = async () => {
 
     for (const job of currentExternalJobs) {
       const appCount = await Application.countDocuments({ job: job._id });
+      const activeAppsCount = await Application.countDocuments({
+        job: job._id,
+        status: { $in: ['accepted', 'pending'] }
+      });
       const jobCreatedAt = new Date(job.createdAt);
       const isOld = jobCreatedAt < twelveHoursAgo;
+      const isVacancyFull = activeAppsCount >= job.vacancies;
 
       if (isOld) {
-        if (appCount === 0) {
+        // Delete if 0 applications OR if vacancy limit is full
+        if (appCount === 0 || isVacancyFull) {
           await JobPost.findByIdAndDelete(job._id);
+          // Delete associated applications
+          await Application.deleteMany({ job: job._id });
           deletedCount++;
         } else if (job.status !== 'closed') {
+          // Close if it has applications but vacancies aren't full
           job.status = 'closed';
           await job.save();
           closedCount++;
@@ -35,16 +44,27 @@ const cleanupJobs = async () => {
           keptCount++;
         }
       } else {
-        keptCount++;
+        // If fresh (<12h) but vacancies are full, close it
+        if (isVacancyFull) {
+          if (job.status !== 'closed') {
+            job.status = 'closed';
+            await job.save();
+            closedCount++;
+          } else {
+            keptCount++;
+          }
+        } else {
+          keptCount++;
+        }
       }
     }
-    console.log(`[Job Fetcher Cleanup] External jobs: Deleted ${deletedCount} old, closed ${closedCount} old with apps, kept ${keptCount} fresh.`);
+    console.log(`[Job Fetcher Cleanup] External jobs: Deleted ${deletedCount} old/full, closed ${closedCount} full/old with apps, kept ${keptCount} fresh.`);
 
-    // 2. Audit all open jobs (internal & external) for full vacancies
-    const openJobs = await JobPost.find({ status: 'open' });
-    let autoClosedVacanciesCount = 0;
+    // 2. Audit recruiter-posted open jobs (isExternal: false) for full vacancies
+    const openRecruiterJobs = await JobPost.find({ status: 'open', isExternal: false });
+    let autoClosedRecruiterCount = 0;
 
-    for (const job of openJobs) {
+    for (const job of openRecruiterJobs) {
       const activeAppsCount = await Application.countDocuments({
         job: job._id,
         status: { $in: ['accepted', 'pending'] }
@@ -52,11 +72,11 @@ const cleanupJobs = async () => {
       if (activeAppsCount >= job.vacancies) {
         job.status = 'closed';
         await job.save();
-        autoClosedVacanciesCount++;
-        console.log(`[Job Fetcher Cleanup] Auto-closed job "${job.title}" by ${job.companyName} due to full vacancies (${activeAppsCount}/${job.vacancies}).`);
+        autoClosedRecruiterCount++;
+        console.log(`[Job Fetcher Cleanup] Auto-closed recruiter job "${job.title}" by ${job.companyName} due to full vacancies (${activeAppsCount}/${job.vacancies}).`);
       }
     }
-    console.log(`[Job Fetcher Cleanup] Vacancy audit: Auto-closed ${autoClosedVacanciesCount} full-vacancy jobs.`);
+    console.log(`[Job Fetcher Cleanup] Recruiter jobs vacancy audit: Auto-closed ${autoClosedRecruiterCount} full-vacancy recruiter jobs.`);
   } catch (error) {
     console.error('[Job Fetcher Cleanup] Error during cleanup:', error.message);
   }
