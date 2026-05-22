@@ -142,16 +142,20 @@ const makeChainable = (arr, collectionName) => {
   const wrappedList = arr.map(item => wrapDoc(collectionName, item));
   
   wrappedList.sort = function(sortObj) {
-    const key = Object.keys(sortObj)[0];
-    const order = sortObj[key];
-    wrappedList.sort((a, b) => {
-      const valA = a[key];
-      const valB = b[key];
-      if (valA < valB) return order === -1 ? 1 : -1;
-      if (valA > valB) return order === -1 ? -1 : 1;
-      return 0;
-    });
-    return makeChainable(wrappedList, collectionName);
+    if (sortObj && typeof sortObj === 'object' && !Array.isArray(sortObj)) {
+      const key = Object.keys(sortObj)[0];
+      const order = sortObj[key];
+      Array.prototype.sort.call(wrappedList, (a, b) => {
+        const valA = a[key];
+        const valB = b[key];
+        if (valA < valB) return order === -1 ? 1 : -1;
+        if (valA > valB) return order === -1 ? -1 : 1;
+        return 0;
+      });
+      return makeChainable(wrappedList, collectionName);
+    }
+    Array.prototype.sort.call(wrappedList, sortObj);
+    return wrappedList;
   };
   
   wrappedList.populate = function(pathStr) {

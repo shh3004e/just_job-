@@ -4,6 +4,65 @@ const JobPost = require('../models/JobPost');
 const Application = require('../models/Application');
 
 /**
+ * Automatically clean up expired external jobs (older than 12 hours)
+ * and close jobs that have filled their vacancies.
+ */
+const cleanupJobs = async () => {
+  try {
+    console.log('[Job Fetcher Cleanup] Starting job listing audit...');
+    const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000);
+    
+    // 1. Process external jobs
+    const currentExternalJobs = await JobPost.find({ isExternal: true });
+    let deletedCount = 0;
+    let closedCount = 0;
+    let keptCount = 0;
+
+    for (const job of currentExternalJobs) {
+      const appCount = await Application.countDocuments({ job: job._id });
+      const jobCreatedAt = new Date(job.createdAt);
+      const isOld = jobCreatedAt < twelveHoursAgo;
+
+      if (isOld) {
+        if (appCount === 0) {
+          await JobPost.findByIdAndDelete(job._id);
+          deletedCount++;
+        } else if (job.status !== 'closed') {
+          job.status = 'closed';
+          await job.save();
+          closedCount++;
+        } else {
+          keptCount++;
+        }
+      } else {
+        keptCount++;
+      }
+    }
+    console.log(`[Job Fetcher Cleanup] External jobs: Deleted ${deletedCount} old, closed ${closedCount} old with apps, kept ${keptCount} fresh.`);
+
+    // 2. Audit all open jobs (internal & external) for full vacancies
+    const openJobs = await JobPost.find({ status: 'open' });
+    let autoClosedVacanciesCount = 0;
+
+    for (const job of openJobs) {
+      const activeAppsCount = await Application.countDocuments({
+        job: job._id,
+        status: { $in: ['accepted', 'pending'] }
+      });
+      if (activeAppsCount >= job.vacancies) {
+        job.status = 'closed';
+        await job.save();
+        autoClosedVacanciesCount++;
+        console.log(`[Job Fetcher Cleanup] Auto-closed job "${job.title}" by ${job.companyName} due to full vacancies (${activeAppsCount}/${job.vacancies}).`);
+      }
+    }
+    console.log(`[Job Fetcher Cleanup] Vacancy audit: Auto-closed ${autoClosedVacanciesCount} full-vacancy jobs.`);
+  } catch (error) {
+    console.error('[Job Fetcher Cleanup] Error during cleanup:', error.message);
+  }
+};
+
+/**
  * Fetch and import design jobs from OpenRouter using Gemini 2.5
  */
 const fetchRealtimeJobs = async () => {
@@ -120,22 +179,8 @@ Do not include any introductory or concluding text. Return only the JSON object.
     const fetchedJobs = parsedData.jobs || [];
     console.log(`[Job Fetcher] Successfully parsed ${fetchedJobs.length} external job postings from OpenRouter API.`);
 
-    // 3. Clean up old external jobs (isExternal: true) with zero applications
-    console.log('[Job Fetcher] Performing daily cleanup on older external job postings...');
-    const currentExternalJobs = await JobPost.find({ isExternal: true });
-    let deletedCount = 0;
-    let keptCount = 0;
-
-    for (const job of currentExternalJobs) {
-      const appCount = await Application.countDocuments({ job: job._id });
-      if (appCount === 0) {
-        await JobPost.findByIdAndDelete(job._id);
-        deletedCount++;
-      } else {
-        keptCount++;
-      }
-    }
-    console.log(`[Job Fetcher] Cleaned up ${deletedCount} unused external jobs. Kept ${keptCount} external jobs with active seeker applications.`);
+    // 3. Clean up old external jobs and audit vacancies
+    await cleanupJobs();
 
     // 4. Save newly fetched valid jobs
     let importedCount = 0;
@@ -196,5 +241,6 @@ Do not include any introductory or concluding text. Return only the JSON object.
 };
 
 module.exports = {
-  fetchRealtimeJobs
+  fetchRealtimeJobs,
+  cleanupJobs
 };
