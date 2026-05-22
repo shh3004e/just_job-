@@ -40,6 +40,7 @@ const HRDashboard = ({ user }) => {
   // Tools definitions
   const graphicTools = ['Photoshop', 'Illustrator', 'CorelDRAW', 'Canva', 'Figma'];
   const uiuxTools = ['Figma', 'Adobe XD', 'Framer', 'Midjourney', 'ChatGPT', 'Runway', 'Adobe Firefly'];
+  const motionTools = ['After Effects', 'Premiere Pro', 'Cinema 4D', 'Blender', 'Maya', 'Figma'];
 
   useEffect(() => {
     fetchRecruiterJobs();
@@ -309,7 +310,12 @@ const HRDashboard = ({ user }) => {
     return nameMatch || emailMatch || toolsMatch || skillsMatch;
   });
 
-  const toolsList = role === 'Graphic Designer' ? graphicTools : uiuxTools;
+  const toolsList = 
+    role === 'Graphic Designer' 
+      ? graphicTools 
+      : role === 'Motion Graphic Designer' 
+      ? motionTools 
+      : uiuxTools;
 
   return (
     <div className="container animate-fade-in" style={{ padding: '20px 0', minHeight: '80vh' }}>
@@ -477,6 +483,7 @@ const HRDashboard = ({ user }) => {
                     <select className="form-control" value={role} onChange={handleRoleChange}>
                       <option value="Graphic Designer">Graphic Designer</option>
                       <option value="UI/UX Designer">UI/UX Designer</option>
+                      <option value="Motion Graphic Designer">Motion Graphic Designer</option>
                     </select>
                   </div>
 

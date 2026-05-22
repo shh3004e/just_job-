@@ -146,7 +146,7 @@ const Landing = ({ user, profile, refreshMe }) => {
             marginBottom: '32px',
             maxWidth: '560px'
           }}>
-            JJ Just Job is a focused portal where <strong>Graphic Designers</strong> and <strong>UI/UX Designers</strong> with AI-tool experience meet hiring managers — without the noise.
+            JJ Just Job is a focused portal where <strong>Graphic Designers</strong>, <strong>Motion Graphic Designers</strong>, and <strong>UI/UX Designers</strong> with AI-tool experience meet hiring managers — without the noise.
           </p>
           
           <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '40px' }}>
@@ -190,11 +190,11 @@ const Landing = ({ user, profile, refreshMe }) => {
               <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', marginTop: '2px' }}>Avg. Min. Salary</div>
             </div>
             <div>
-              <div style={{ fontSize: '28px', fontWeight: '800', color: '#1d2226', fontFamily: 'var(--font-family-display)' }}>2 tracks</div>
+              <div style={{ fontSize: '28px', fontWeight: '800', color: '#1d2226', fontFamily: 'var(--font-family-display)' }}>3 tracks</div>
               <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', marginTop: '2px' }}>Designer roles only</div>
             </div>
             <div>
-              <div style={{ fontSize: '28px', fontWeight: '800', color: '#1d2226', fontFamily: 'var(--font-family-display)' }}>10+</div>
+              <div style={{ fontSize: '28px', fontWeight: '800', color: '#1d2226', fontFamily: 'var(--font-family-display)' }}>12+</div>
               <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', marginTop: '2px' }}>AI tools tracked</div>
             </div>
           </div>
@@ -272,7 +272,7 @@ const Landing = ({ user, profile, refreshMe }) => {
             display: 'block',
             marginBottom: '8px'
           }}>
-            Two Tracks. Zero Noise.
+            Three Tracks. Zero Noise.
           </span>
           <h2 style={{
             fontSize: '36px',
@@ -286,7 +286,7 @@ const Landing = ({ user, profile, refreshMe }) => {
         
         <div style={{
           display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
           gap: '30px'
         }} className="tracks-grid">
           {/* Card 1: Graphic Designer */}
@@ -367,6 +367,50 @@ const Landing = ({ user, profile, refreshMe }) => {
                   padding: '6px 14px',
                   backgroundColor: '#ecfdf5',
                   color: '#059669',
+                  borderRadius: 'var(--radius-full)',
+                  fontSize: '13px',
+                  fontWeight: '600'
+                }}>
+                  {tag}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Card 3: Motion Graphic Designer */}
+          <div className="card" style={{
+            padding: '40px 30px',
+            backgroundColor: 'white',
+            borderRadius: 'var(--radius-lg)',
+            border: '1px solid var(--border-color)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'flex-start',
+            gap: '20px'
+          }}>
+            <div style={{
+              width: '54px',
+              height: '54px',
+              borderRadius: '12px',
+              backgroundColor: '#fff7ed',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#ea580c'
+            }}>
+              <Laptop size={28} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '24px', fontWeight: '800', color: '#1d2226' }}>Motion Graphic Designer</h3>
+              <p style={{ fontSize: '14px', color: 'var(--text-muted)', marginTop: '4px' }}>Fresher only • 0-12 months</p>
+            </div>
+            
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '10px' }}>
+              {['After Effects', 'Premiere Pro', 'Cinema 4D', 'Blender', 'Maya', 'Figma'].map((tag) => (
+                <span key={tag} style={{
+                  padding: '6px 14px',
+                  backgroundColor: '#fff7ed',
+                  color: '#ea580c',
                   borderRadius: 'var(--radius-full)',
                   fontSize: '13px',
                   fontWeight: '600'
@@ -602,7 +646,7 @@ const Landing = ({ user, profile, refreshMe }) => {
 
             {/* Filter Buttons */}
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {['All', 'Graphic Designer', 'UI/UX Designer'].map((role) => (
+              {['All', 'Graphic Designer', 'UI/UX Designer', 'Motion Graphic Designer'].map((role) => (
                 <button
                   key={role}
                   onClick={() => setRoleFilter(role)}

@@ -50,6 +50,7 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
   // Define tools lists
   const graphicTools = ['Photoshop', 'Illustrator', 'CorelDRAW', 'Canva', 'Figma'];
   const uiuxTools = ['Figma', 'Adobe XD', 'Framer', 'Midjourney', 'ChatGPT', 'Runway', 'Adobe Firefly'];
+  const motionTools = ['After Effects', 'Premiere Pro', 'Cinema 4D', 'Blender', 'Maya', 'Figma'];
   const monthOptions = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
   const yearOptions = ['2018', '2019', '2020', '2021', '2022', '2023', '2024', '2025', '2026', '2027'];
 
@@ -273,7 +274,12 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
   const mustCreateProfile = !profile;
 
   if (mustCreateProfile || editing) {
-    const currentToolsList = position === 'Graphic Designer' ? graphicTools : uiuxTools;
+    const currentToolsList = 
+      position === 'Graphic Designer' 
+        ? graphicTools 
+        : position === 'Motion Graphic Designer' 
+        ? motionTools 
+        : uiuxTools;
 
     return (
       <div className="container animate-fade-in" style={{ padding: '20px 0' }}>
@@ -383,6 +389,7 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
                 <select className="form-control" value={position} onChange={handlePositionChange}>
                   <option value="Graphic Designer">Graphic Designer</option>
                   <option value="UI/UX Designer">UI/UX Designer</option>
+                  <option value="Motion Graphic Designer">Motion Graphic Designer</option>
                 </select>
               </div>
 

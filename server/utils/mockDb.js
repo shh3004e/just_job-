@@ -179,11 +179,11 @@ const makeChainable = (arr, collectionName) => {
   };
 
   wrappedList.then = function(onFulfilled, onRejected) {
-    return Promise.resolve(this).then(onFulfilled, onRejected);
+    return Promise.resolve([...this]).then(onFulfilled, onRejected);
   };
 
   wrappedList.catch = function(onRejected) {
-    return Promise.resolve(this).catch(onRejected);
+    return Promise.resolve([...this]).catch(onRejected);
   };
   
   return wrappedList;
@@ -227,6 +227,10 @@ const JobPost = {
   find: (query = {}) => {
     const filtered = data.jobs.filter(item => evaluateQuery(item, query));
     return makeChainable(filtered, 'jobs');
+  },
+  findOne: (query) => {
+    const j = data.jobs.find(item => evaluateQuery(item, query));
+    return makeSingleChainable(j, 'jobs');
   },
   findById: (id) => {
     if (!id) return makeSingleChainable(null, 'jobs');

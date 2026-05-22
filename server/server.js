@@ -8,7 +8,13 @@ const connectDB = require('./config/db');
 dotenv.config();
 
 // Connect to Database
-connectDB();
+connectDB().then(() => {
+  // Sync real-time external jobs from OpenRouter on startup and schedule daily updates
+  const { fetchRealtimeJobs } = require('./utils/jobFetcher');
+  fetchRealtimeJobs();
+  // Schedule to run every 24 hours (86400000 ms)
+  setInterval(fetchRealtimeJobs, 24 * 60 * 60 * 1000);
+});
 
 const app = express();
 

@@ -28,7 +28,7 @@ const JobPostSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['Graphic Designer', 'UI/UX Designer'],
+    enum: ['Graphic Designer', 'UI/UX Designer', 'Motion Graphic Designer'],
     required: [true, 'Please select a job role']
   },
   experienceType: {
@@ -88,6 +88,13 @@ const JobPostSchema = new mongoose.Schema({
     type: String,
     enum: ['open', 'closed'],
     default: 'open'
+  },
+  isExternal: {
+    type: Boolean,
+    default: false
+  },
+  externalId: {
+    type: String
   },
   createdAt: {
     type: Date,
