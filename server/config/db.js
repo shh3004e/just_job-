@@ -1,6 +1,9 @@
 const { Pool } = require('pg');
 const initDb = require('./initDb');
 
+// Default to mock database until connection confirms success
+global.useMockDb = true;
+
 const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:Suryansh@4002@db.ikqoglnaqfhfwdrppxkq.supabase.co:5432/postgres';
 
 const pool = new Pool({
