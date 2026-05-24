@@ -52,6 +52,13 @@ const YetiCharacter = ({ isPasswordFocused }) => {
       });
 
     return () => {
+      if (splineAppRef.current) {
+        try {
+          splineAppRef.current.dispose();
+        } catch (e) {
+          // Safe catch
+        }
+      }
       splineAppRef.current = null;
     };
   }, []);
@@ -298,7 +305,8 @@ const Auth = ({ login, user }) => {
       if (res.status === 403 && json.isNotVerified) {
         setVerificationData({
           email: json.email,
-          role: json.role
+          role: json.role,
+          devHelper: json.devHelper
         });
         setError('');
         return;

@@ -101,7 +101,11 @@ router.post('/login', async (req, res) => {
         message: 'Account not verified. Please verify your OTP codes first.',
         isNotVerified: true,
         email: user.email,
-        role: user.role
+        role: user.role,
+        devHelper: {
+          emailOtp: user.email_otp,
+          mobileOtp: user.mobile_otp
+        }
       });
     }
 
