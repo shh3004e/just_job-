@@ -27,3 +27,8 @@ logs/
 # OS metadata
 .DS_Store
 Thumbs.db
+
+# Data registries (PII)
+verified_users.csv
+login_activities.csv
+

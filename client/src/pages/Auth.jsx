@@ -36,22 +36,35 @@ const YetiCharacter = ({ isPasswordFocused }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!canvasRef.current) return;
+    let active = true;
+    
+    // Find canvas element by ID or fall back to ref
+    const canvas = document.getElementById('canvas3d') || canvasRef.current;
+    if (!canvas) return;
 
-    const app = new Application(canvasRef.current);
+    // Initialize the Spline Application
+    const app = new Application(canvas);
     splineAppRef.current = app;
 
     app.load('https://prod.spline.design/VR1pPGDZAym0Mltb/scene.splinecode')
       .then(() => {
+        if (!active) {
+          try {
+            app.dispose();
+          } catch (e) {}
+          return;
+        }
         setLoading(false);
-        // Set initial state
         updateSplineVariables(app, isPasswordFocused);
       })
       .catch((err) => {
-        console.error('Error loading Spline 3D scene:', err);
+        if (active) {
+          console.error('Error loading Spline 3D scene:', err);
+        }
       });
 
     return () => {
+      active = false;
       if (splineAppRef.current) {
         try {
           splineAppRef.current.dispose();
@@ -71,7 +84,6 @@ const YetiCharacter = ({ isPasswordFocused }) => {
   }, [isPasswordFocused, loading]);
 
   const updateSplineVariables = (app, isFocused) => {
-    // Set common variables for covering eyes in Spline models
     const commonVars = ['check', 'isPassword', 'password', 'cover', 'isFocus', 'hideEyes'];
     commonVars.forEach((varName) => {
       try {

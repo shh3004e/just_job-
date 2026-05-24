@@ -5,7 +5,7 @@ const User = require('../models/User');
 const JobSeekerProfile = require('../models/JobSeekerProfile');
 const { protect } = require('../middleware/authMiddleware');
 const { sendRegistrationOtp } = require('../utils/mailer');
-const { appendToExcel } = require('../utils/excelLogger');
+const { appendToExcel, logLogin } = require('../utils/excelLogger');
 
 // JWT signer helper
 const generateToken = (id) => {
@@ -28,7 +28,7 @@ router.post('/register', async (req, res) => {
     // Check if user already exists
     const userExists = await User.findOne({ email });
     if (userExists) {
-      return res.status(400).json({ success: false, message: 'User already exists with this email' });
+      return res.status(400).json({ success: false, message: 'User is already registered, please log in' });
     }
 
     // Generate numeric 6-digit OTPs
@@ -113,6 +113,11 @@ router.post('/login', async (req, res) => {
 
     const token = generateToken(user._id);
 
+    // Log successful login to login_activities table and CSV
+    logLogin(user.name, user.email, user.role, user._id).catch(err => {
+      console.error('Error logging login event:', err.message);
+    });
+
     res.status(200).json({
       success: true,
       token,
@@ -158,6 +163,11 @@ router.post('/verify-otp', async (req, res) => {
 
     // Generate token now
     const token = generateToken(user._id);
+
+    // Log successful login to login_activities table and CSV upon first verification
+    logLogin(user.name, user.email, user.role, user._id).catch(err => {
+      console.error('Error logging verified login event:', err.message);
+    });
 
     res.status(200).json({
       success: true,
@@ -260,6 +270,11 @@ router.post('/google', async (req, res) => {
     }
 
     const token = generateToken(user._id);
+
+    // Log successful login to login_activities table and CSV
+    logLogin(user.name, user.email, user.role, user._id).catch(err => {
+      console.error('Error logging Google login event:', err.message);
+    });
 
     res.status(200).json({
       success: true,

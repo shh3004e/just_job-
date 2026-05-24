@@ -106,6 +106,17 @@ const initDb = async (pool) => {
       )
     `);
 
+    // Table 6: login_activities
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS login_activities (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id UUID,
+        email VARCHAR(255) NOT NULL,
+        role VARCHAR(50) NOT NULL,
+        login_time TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     console.log('[initDb] All tables created or verified successfully!');
   } catch (error) {
     console.error('[initDb] Error initializing database tables:', error.message);

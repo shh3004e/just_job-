@@ -6,10 +6,12 @@ const dbPath = path.join(__dirname, '../db.json');
 
 // Initialize database data
 let data = {
-  users: [],
+  job_seekers: [],
+  hiring_managers: [],
   jobs: [],
   profiles: [],
-  applications: []
+  applications: [],
+  login_activities: []
 };
 
 // Load data from file if exists
@@ -17,7 +19,35 @@ const loadFromFile = () => {
   try {
     if (fs.existsSync(dbPath)) {
       const fileData = fs.readFileSync(dbPath, 'utf8');
-      data = JSON.parse(fileData);
+      const parsed = JSON.parse(fileData);
+      
+      // Migrate old data structure (users -> job_seekers/hiring_managers)
+      if (parsed.users && Array.isArray(parsed.users)) {
+        parsed.job_seekers = parsed.job_seekers || [];
+        parsed.hiring_managers = parsed.hiring_managers || [];
+        parsed.users.forEach(u => {
+          if (u.role === 'recruiter') {
+            if (!parsed.hiring_managers.some(x => x.email === u.email)) {
+              parsed.hiring_managers.push(u);
+            }
+          } else {
+            if (!parsed.job_seekers.some(x => x.email === u.email)) {
+              parsed.job_seekers.push(u);
+            }
+          }
+        });
+        delete parsed.users;
+      }
+      
+      data = {
+        job_seekers: parsed.job_seekers || [],
+        hiring_managers: parsed.hiring_managers || [],
+        jobs: parsed.jobs || [],
+        profiles: parsed.profiles || [],
+        applications: parsed.applications || [],
+        login_activities: parsed.login_activities || []
+      };
+      saveToFile();
     }
   } catch (err) {
     console.error('Error loading mock database file, starting fresh:', err.message);
@@ -104,7 +134,7 @@ const wrapDoc = (collectionName, doc) => {
   };
 
   wrapped.matchPassword = async function(enteredPassword) {
-    if (collectionName === 'users') {
+    if (collectionName === 'job_seekers' || collectionName === 'hiring_managers' || collectionName === 'users') {
       return await bcrypt.compare(enteredPassword, this.password);
     }
     return false;
@@ -201,13 +231,51 @@ const generateId = () => {
 // User Mock Model
 const User = {
   findOne: (query) => {
-    const u = data.users.find(item => evaluateQuery(item, query));
-    return makeSingleChainable(u, 'users');
+    // If role is specified, look in that specific array. Otherwise look in both.
+    let u = null;
+    let col = 'job_seekers';
+    
+    if (query.role === 'recruiter') {
+      u = data.hiring_managers.find(item => evaluateQuery(item, query));
+      col = 'hiring_managers';
+    } else if (query.role === 'seeker') {
+      u = data.job_seekers.find(item => evaluateQuery(item, query));
+      col = 'job_seekers';
+    } else {
+      // Look in job_seekers first, then hiring_managers
+      u = data.job_seekers.find(item => evaluateQuery(item, query));
+      if (u) {
+        u.role = 'seeker';
+        col = 'job_seekers';
+      } else {
+        u = data.hiring_managers.find(item => evaluateQuery(item, query));
+        if (u) {
+          u.role = 'recruiter';
+          col = 'hiring_managers';
+        }
+      }
+    }
+    
+    return makeSingleChainable(u, col);
   },
   findById: (id) => {
-    if (!id) return makeSingleChainable(null, 'users');
-    const u = data.users.find(item => item._id === id.toString());
-    return makeSingleChainable(u, 'users');
+    if (!id) return makeSingleChainable(null, 'job_seekers');
+    const idStr = id.toString();
+    
+    let u = data.job_seekers.find(item => item._id === idStr);
+    let col = 'job_seekers';
+    
+    if (u) {
+      u.role = 'seeker';
+    } else {
+      u = data.hiring_managers.find(item => item._id === idStr);
+      if (u) {
+        u.role = 'recruiter';
+        col = 'hiring_managers';
+      }
+    }
+    
+    return makeSingleChainable(u, col);
   },
   create: async (userDoc) => {
     const salt = await bcrypt.genSalt(10);
@@ -220,9 +288,10 @@ const User = {
       createdAt: new Date().toISOString()
     };
     
-    data.users.push(newUser);
+    const col = userDoc.role === 'recruiter' ? 'hiring_managers' : 'job_seekers';
+    data[col].push(newUser);
     saveToFile();
-    return wrapDoc('users', newUser);
+    return wrapDoc(col, newUser);
   }
 };
 
