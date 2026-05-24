@@ -4,6 +4,8 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const JobSeekerProfile = require('../models/JobSeekerProfile');
 const { protect } = require('../middleware/authMiddleware');
+const { sendRegistrationOtp } = require('../utils/mailer');
+const { appendToExcel } = require('../utils/excelLogger');
 
 // JWT signer helper
 const generateToken = (id) => {
@@ -17,7 +19,11 @@ const generateToken = (id) => {
 // @access  Public
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, role, mobile } = req.body;
+
+    if (!name || !email || !password || !role || !mobile) {
+      return res.status(400).json({ success: false, message: 'Please fill in all registration fields' });
+    }
 
     // Check if user already exists
     const userExists = await User.findOne({ email });
@@ -25,24 +31,38 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ success: false, message: 'User already exists with this email' });
     }
 
+    // Generate numeric 6-digit OTPs
+    const emailOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    const mobileOtp = Math.floor(100000 + Math.random() * 900000).toString();
+
     // Create user
     const user = await User.create({
       name,
       email,
       password,
-      role
+      role,
+      mobile,
+      email_otp: emailOtp,
+      mobile_otp: mobileOtp,
+      email_verified: false,
+      mobile_verified: false
     });
 
-    const token = generateToken(user._id);
+    // Send OTP verification email
+    await sendRegistrationOtp(email, name, emailOtp, mobileOtp);
 
     res.status(201).json({
       success: true,
-      token,
-      user: {
+      message: 'Registration successful. Verification OTP codes have been sent.',
+      tempUser: {
         id: user._id,
         name: user.name,
         email: user.email,
         role: user.role
+      },
+      devHelper: {
+        emailOtp,
+        mobileOtp
       }
     });
   } catch (error) {
@@ -63,7 +83,7 @@ router.post('/login', async (req, res) => {
     }
 
     // Check for user
-    const user = await User.findOne({ email }).select('+password');
+    const user = await User.findOne({ email });
     if (!user) {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
@@ -74,10 +94,68 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
+    // Block unverified users from logging in
+    if (!user.email_verified || !user.mobile_verified) {
+      return res.status(403).json({
+        success: false,
+        message: 'Account not verified. Please verify your OTP codes first.',
+        isNotVerified: true,
+        email: user.email,
+        role: user.role
+      });
+    }
+
     const token = generateToken(user._id);
 
     res.status(200).json({
       success: true,
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @desc    Verify OTP codes
+// @route   POST /api/auth/verify-otp
+// @access  Public
+router.post('/verify-otp', async (req, res) => {
+  try {
+    const { email, role, emailOtp, mobileOtp } = req.body;
+
+    if (!email || !role || !emailOtp || !mobileOtp) {
+      return res.status(400).json({ success: false, message: 'Please provide all details and verification codes' });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user || user.role !== role) {
+      return res.status(404).json({ success: false, message: 'Account registry not found' });
+    }
+
+    if (user.email_otp !== emailOtp || user.mobile_otp !== mobileOtp) {
+      return res.status(400).json({ success: false, message: 'Invalid OTP codes. Please double check.' });
+    }
+
+    // Mark verified
+    user.email_verified = true;
+    user.mobile_verified = true;
+    await user.save();
+
+    // Log to Excel registry sheet
+    await appendToExcel(user.name, user.email, user.role);
+
+    // Generate token now
+    const token = generateToken(user._id);
+
+    res.status(200).json({
+      success: true,
+      message: 'Account verified successfully!',
       token,
       user: {
         id: user._id,
@@ -163,8 +241,16 @@ router.post('/google', async (req, res) => {
         name,
         email,
         password: randomPassword,
-        role: userRole
+        role: userRole,
+        mobile: '',
+        email_otp: '',
+        mobile_otp: '',
+        email_verified: true,
+        mobile_verified: true
       });
+
+      // Log immediately to Excel registry sheet
+      await appendToExcel(name, email, userRole);
     }
 
     const token = generateToken(user._id);

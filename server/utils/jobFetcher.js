@@ -83,25 +83,25 @@ const cleanupJobs = async () => {
 };
 
 /**
- * Fetch and import design jobs from OpenRouter using Gemini 2.5
+ * Fetch and import design jobs from Groq using Llama 3.3
  */
 const fetchRealtimeJobs = async () => {
   try {
     console.log('[Job Fetcher] Starting daily external jobs sync...');
 
-    const apiKey = process.env.OPENROUTER_API_KEY;
+    const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
-      console.warn('[Job Fetcher] OPENROUTER_API_KEY is not defined in environment variables. Skipping sync.');
+      console.warn('[Job Fetcher] GROQ_API_KEY is not defined in environment variables. Skipping sync.');
       return;
     }
 
-    // 1. Ensure the OpenRouter bot user exists
-    const botEmail = 'openrouter.bot@jjjustjob.com';
+    // 1. Ensure the Groq bot user exists
+    const botEmail = 'groq.bot@jjjustjob.com';
     let botUser = await User.findOne({ email: botEmail });
     if (!botUser) {
       console.log('[Job Fetcher] Creating Bot Recruiter user account...');
       botUser = await User.create({
-        name: 'OpenRouter Jobs Bot',
+        name: 'Groq Jobs Bot',
         email: botEmail,
         password: crypto.randomBytes(16).toString('hex'),
         role: 'recruiter'
@@ -111,7 +111,7 @@ const fetchRealtimeJobs = async () => {
       console.log(`[Job Fetcher] Bot Recruiter account found (ID: ${botUser._id})`);
     }
 
-    // 2. Fetch new jobs from OpenRouter
+    // 2. Fetch new jobs from Groq
     const currentDateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     const prompt = `You are a real-time job scanner assistant. Your goal is to return a list of 8 to 12 real, active, and fresh job postings in India (or Remote) for creative designers. Today's date is ${currentDateStr}.
 Fetch or generate high-quality job postings matching these rules:
@@ -120,12 +120,11 @@ Fetch or generate high-quality job postings matching these rules:
 3. Salary: Monthly salary in INR must be a number NOT less than 12000 (e.g., 25000, 30000, etc.).
 4. Vacancies: Number of vacancies must be between 1 and 20. Do NOT exceed 20 vacancies.
 5. Experience: Fresher level only (0-11 months, or 0-1 years).
-   - If experienceType is "months", experienceValue must be between 0 and 11.
-   - If experienceType is "years", experienceValue must be 0 or 1.
 6. Tools: List relevant software tools (e.g. Photoshop, Figma, After Effects, Illustrator, Blender, Cinema 4D).
 7. Location: Specify a realistic city (e.g. Bangalore, Mumbai, Delhi, Hyderabad) or "Remote".
 8. jobType: Must be exactly "Remote", "On-site", or "Hybrid".
-9. Details: Provide a realistic companyName, companyDescription, detailed role description, valid hrEmail, and a unique externalId.
+9. Details: Provide a realistic companyName, companyDescription, detailed role description, and a unique externalId.
+   For the hrEmail field, you MUST search your knowledge base and provide the actual, real-world official careers or HR contact email address for the company (e.g., careers@company.com or hr@company.com). If you cannot find or are not sure of a real, official careers/HR contact email address for this company, you MUST set the hrEmail field to "no mail". Do NOT make up fake email addresses.
 
 Format the response strictly as a JSON object with a single key "jobs" containing an array of job objects:
 {
@@ -143,24 +142,22 @@ Format the response strictly as a JSON object with a single key "jobs" containin
       "salary": 32000,
       "location": "Remote",
       "vacancies": 3,
-      "hrEmail": "recruitment@techvantage.io",
+      "hrEmail": "careers@techvantage.io",
       "externalId": "or_jv_uiux_001"
     }
   ]
 }
 Do not include any introductory or concluding text. Return only the JSON object.`;
 
-    console.log('[Job Fetcher] Requesting fresh job listings from OpenRouter API...');
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    console.log('[Job Fetcher] Requesting fresh job listings from Groq API...');
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-        'HTTP-Referer': 'http://localhost:3000',
-        'X-Title': 'JJ Just Job Portal'
+        'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'llama-3.3-70b-versatile',
         messages: [
           {
             role: 'user',
@@ -174,13 +171,13 @@ Do not include any introductory or concluding text. Return only the JSON object.
 
     if (!response.ok) {
       const errText = await response.text();
-      throw new Error(`OpenRouter API responded with status ${response.status}: ${errText}`);
+      throw new Error(`Groq API responded with status ${response.status}: ${errText}`);
     }
 
     const resJson = await response.json();
     let modelText = resJson.choices?.[0]?.message?.content;
     if (!modelText) {
-      throw new Error('Received empty completions message from OpenRouter.');
+      throw new Error('Received empty completions message from Groq.');
     }
 
     // Clean potential markdown tags from LLM response
@@ -197,7 +194,7 @@ Do not include any introductory or concluding text. Return only the JSON object.
 
     const parsedData = JSON.parse(modelText);
     const fetchedJobs = parsedData.jobs || [];
-    console.log(`[Job Fetcher] Successfully parsed ${fetchedJobs.length} external job postings from OpenRouter API.`);
+    console.log(`[Job Fetcher] Successfully parsed ${fetchedJobs.length} external job postings from Groq API.`);
 
     // 3. Clean up old external jobs and audit vacancies
     await cleanupJobs();
@@ -256,7 +253,7 @@ Do not include any introductory or concluding text. Return only the JSON object.
 
     console.log(`[Job Fetcher] Daily sync complete. Imported ${importedCount} new external job listings.`);
   } catch (error) {
-    console.error('[Job Fetcher] Error during OpenRouter jobs fetch:', error.message);
+    console.error('[Job Fetcher] Error during Groq jobs fetch:', error.message);
   }
 };
 

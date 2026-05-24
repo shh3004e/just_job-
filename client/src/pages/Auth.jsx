@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { LogIn, UserPlus, Briefcase, User as UserIcon, Mail, Lock, ShieldAlert } from 'lucide-react';
+import { Application } from '@splinetool/runtime';
 
 const mockAccounts = [
   {
@@ -29,8 +30,90 @@ const mockAccounts = [
   }
 ];
 
+const YetiCharacter = ({ isPasswordFocused }) => {
+  const canvasRef = useRef(null);
+  const splineAppRef = useRef(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!canvasRef.current) return;
+
+    const app = new Application(canvasRef.current);
+    splineAppRef.current = app;
+
+    app.load('https://prod.spline.design/VR1pPGDZAym0Mltb/scene.splinecode')
+      .then(() => {
+        setLoading(false);
+        // Set initial state
+        updateSplineVariables(app, isPasswordFocused);
+      })
+      .catch((err) => {
+        console.error('Error loading Spline 3D scene:', err);
+      });
+
+    return () => {
+      splineAppRef.current = null;
+    };
+  }, []);
+
+  // Update variables when password focus changes
+  useEffect(() => {
+    if (splineAppRef.current && !loading) {
+      updateSplineVariables(splineAppRef.current, isPasswordFocused);
+    }
+  }, [isPasswordFocused, loading]);
+
+  const updateSplineVariables = (app, isFocused) => {
+    // Set common variables for covering eyes in Spline models
+    const commonVars = ['check', 'isPassword', 'password', 'cover', 'isFocus', 'hideEyes'];
+    commonVars.forEach((varName) => {
+      try {
+        app.setVariable(varName, isFocused);
+      } catch (e) {
+        // Safe catch for missing variables
+      }
+    });
+  };
+
+  return (
+    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+      {loading && (
+        <div style={{
+          position: 'absolute',
+          top: 0, left: 0, right: 0, bottom: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'linear-gradient(135deg, #bae6fd 0%, #e0f2fe 100%)',
+          color: 'var(--text-muted)',
+          fontSize: '15px',
+          fontWeight: '600',
+          fontFamily: 'var(--font-family-sans)',
+          zIndex: 5
+        }}>
+          Loading 3D Character...
+        </div>
+      )}
+      <canvas 
+        ref={canvasRef} 
+        id="canvas3d"
+        style={{ 
+          width: '100%', 
+          height: '100%', 
+          display: 'block',
+          background: 'linear-gradient(135deg, #bae6fd 0%, #e0f2fe 100%)'
+        }} 
+      />
+    </div>
+  );
+};
+
 const Auth = ({ login, user }) => {
   const [searchParams] = useSearchParams();
+  
+  const [isPasswordFocused, setIsPasswordFocused] = useState(false);
+  const authCardRef = useRef(null);
+
   const isSignupParam = searchParams.get('signup') === 'true';
 
   const [isLoginTab, setIsLoginTab] = useState(!isSignupParam);
@@ -38,11 +121,18 @@ const Auth = ({ login, user }) => {
     name: '',
     email: '',
     password: '',
+    mobile: '',
     role: 'seeker' // default to Job Seeker
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showMockModal, setShowMockModal] = useState(false);
+
+  // OTP Verification States
+  const [verificationData, setVerificationData] = useState(null); // stores { email, role, devHelper }
+  const [emailOtp, setEmailOtp] = useState('');
+  const [mobileOtp, setMobileOtp] = useState('');
+  const [verifying, setVerifying] = useState(false);
 
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   const roleRef = useRef(formData.role);
@@ -152,6 +242,38 @@ const Auth = ({ login, user }) => {
     setFormData({ ...formData, role: selectedRole });
   };
 
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    setError('');
+    setVerifying(true);
+
+    try {
+      const res = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: verificationData.email,
+          role: verificationData.role,
+          emailOtp,
+          mobileOtp
+        })
+      });
+
+      const json = await res.json();
+      if (json.success) {
+        login(json.token, json.user);
+      } else {
+        setError(json.message || 'Verification failed');
+      }
+    } catch (err) {
+      setError('Could not connect to the verification server.');
+    } finally {
+      setVerifying(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -172,9 +294,27 @@ const Auth = ({ login, user }) => {
       });
 
       const json = await res.json();
+
+      if (res.status === 403 && json.isNotVerified) {
+        setVerificationData({
+          email: json.email,
+          role: json.role
+        });
+        setError('');
+        return;
+      }
+
       if (json.success) {
-        login(json.token, json.user);
-        // Redirects are handled by useEffect
+        if (isLoginTab) {
+          login(json.token, json.user);
+        } else {
+          // Registration succeeded, show OTP verification view
+          setVerificationData({
+            email: formData.email,
+            role: formData.role,
+            devHelper: json.devHelper
+          });
+        }
       } else {
         setError(json.message || 'Authentication failed');
       }
@@ -193,6 +333,7 @@ const Auth = ({ login, user }) => {
         name: 'Jane Doe',
         email: 'jane.design@example.com',
         password: 'password123',
+        mobile: '+91 9999988888',
         role: 'seeker'
       });
     } else {
@@ -200,6 +341,7 @@ const Auth = ({ login, user }) => {
         name: 'Alex HR',
         email: 'cu674300@gmail.com', // use existing recruiter email from db.json
         password: 'password123',
+        mobile: '+91 8888877777',
         role: 'recruiter'
       });
     }
@@ -207,73 +349,71 @@ const Auth = ({ login, user }) => {
 
   return (
     <div className="container animate-fade-in" style={{ padding: '30px 0' }}>
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 1.2fr',
-        minHeight: '80vh',
-        borderRadius: 'var(--radius-lg)',
-        overflow: 'hidden',
-        boxShadow: 'var(--shadow-lg)',
-        backgroundColor: 'white',
-        border: '1px solid var(--border-color)'
-      }} className="auth-split-grid">
+      <div 
+        ref={authCardRef}
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1.2fr',
+          minHeight: '80vh',
+          borderRadius: 'var(--radius-lg)',
+          overflow: 'hidden',
+          boxShadow: 'var(--shadow-lg)',
+          backgroundColor: 'white',
+          border: '1px solid var(--border-color)'
+        }} 
+        className="auth-split-grid"
+      >
         
-        {/* Left Side: Gradient Banner Section (Screenshot 4 Alignment) */}
+        {/* Left Side: Interactive Yeti Section */}
         <div style={{
-          background: 'linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%)',
-          color: 'white',
-          padding: '60px 40px',
+          position: 'relative',
+          overflow: 'hidden',
+          backgroundColor: '#bae6fd',
           display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between'
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '400px'
         }} className="auth-left-banner">
-          <div>
-            {/* Logo */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '80px' }}>
-              <div style={{
-                background: 'white',
-                color: 'var(--primary)',
-                fontWeight: '900',
-                width: '38px',
-                height: '38px',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '20px',
-                fontFamily: 'var(--font-family-display)'
-              }}>
-                JJ
-              </div>
-              <span style={{
-                fontFamily: 'var(--font-family-display)',
-                fontWeight: '800',
-                fontSize: '22px',
-                letterSpacing: '-0.5px',
-                color: 'white'
-              }}>
-                Just Job
-              </span>
-            </div>
-            
-            <h1 style={{
-              fontSize: '44px',
-              fontWeight: '800',
-              lineHeight: '1.2',
-              fontFamily: 'var(--font-family-display)',
-              marginBottom: '20px'
-            }}>
-              Your design career,<br />
-              on the right canvas.
-            </h1>
-            <p style={{ fontSize: '18px', opacity: 0.9, fontWeight: '400', lineHeight: '1.5' }}>
-              One sign-in. Choose your path — apply to jobs or hire fresh talent.
-            </p>
-          </div>
+          <YetiCharacter isPasswordFocused={isPasswordFocused} />
           
-          <div style={{ fontSize: '13px', opacity: 0.7 }}>
-            Powered by Emergent • Secure Google sign-in
-          </div>
+          {/* Text Overlay based on selected role */}
+          {formData.role === 'seeker' ? (
+            <div style={{
+              position: 'absolute',
+              bottom: '35px',
+              left: '35px',
+              color: 'white',
+              fontFamily: 'var(--font-family-display, "Outfit", sans-serif)',
+              fontWeight: '900',
+              fontSize: '38px',
+              lineHeight: '1.1',
+              textTransform: 'uppercase',
+              letterSpacing: '-0.5px',
+              pointerEvents: 'none',
+              textShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
+              zIndex: 10
+            }}>
+              EXPLORE.<br />LEARN. GROW.
+            </div>
+          ) : (
+            <div style={{
+              position: 'absolute',
+              bottom: '35px',
+              left: '35px',
+              color: 'white',
+              fontFamily: 'var(--font-family-display, "Outfit", sans-serif)',
+              fontWeight: '900',
+              fontSize: '34px',
+              lineHeight: '1.1',
+              textTransform: 'uppercase',
+              letterSpacing: '-0.5px',
+              pointerEvents: 'none',
+              textShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
+              zIndex: 10
+            }}>
+              FRESH HIRING<br />WITH EFFORT LESS
+            </div>
+          )}
         </div>
         
         {/* Right Side: Authentication Panel Section */}
@@ -285,136 +425,151 @@ const Auth = ({ login, user }) => {
           backgroundColor: 'white'
         }} className="auth-right-panel">
           
-          {/* Welcome Header */}
-          <div style={{ marginBottom: '24px' }}>
-            <h2 style={{ fontSize: '30px', fontWeight: '800', color: '#1d2226', fontFamily: 'var(--font-family-display)' }}>Welcome</h2>
-            <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '4px' }}>
-              Sign in to continue to JJ Just Job.
+          {/* Welcome/Verification Header */}
+          <div style={{ marginBottom: '24px', textAlign: 'center' }}>
+            <h2 style={{ 
+              fontSize: '28px', 
+              fontWeight: '950', 
+              color: '#0f172a', 
+              textTransform: 'uppercase', 
+              letterSpacing: '0.5px',
+              fontFamily: 'var(--font-family-display, "Outfit", sans-serif)',
+              marginBottom: '6px'
+            }}>
+              {verificationData ? 'VERIFY OTP' : isLoginTab ? 'WELCOME BACK' : 'CREATE ACCOUNT'}
+            </h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
+              {verificationData 
+                ? `Enter the 6-digit codes sent to ${verificationData.email}`
+                : isLoginTab 
+                ? 'Enter your email and password to access your account' 
+                : 'Fill in your details to get started'}
             </p>
           </div>
 
-          {/* Continue with Google Button */}
-          {googleClientId ? (
-            <div id="google-signin-btn" style={{ width: '100%', marginBottom: '24px', display: 'flex', justifyContent: 'center' }}></div>
-          ) : (
-            <button 
-              type="button"
-              onClick={() => setShowMockModal(true)}
-              style={{
-                width: '100%',
-                padding: '12px',
-                borderRadius: '8px',
-                border: '1.5px solid var(--border-color)',
-                backgroundColor: 'white',
-                color: 'var(--text-main)',
-                fontWeight: '600',
-                fontSize: '14px',
+          {!verificationData && (
+            <>
+              {/* Continue with Google Button */}
+              {googleClientId ? (
+                <div id="google-signin-btn" style={{ width: '100%', marginBottom: '24px', display: 'flex', justifyContent: 'center' }}></div>
+              ) : (
+                <button 
+                  type="button"
+                  onClick={() => setShowMockModal(true)}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    border: '1.5px solid var(--border-color)',
+                    backgroundColor: 'white',
+                    color: 'var(--text-main)',
+                    fontWeight: '600',
+                    fontSize: '14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '10px',
+                    cursor: 'pointer',
+                    marginBottom: '24px',
+                    transition: 'var(--transition)'
+                  }}
+                  className="btn-outline-hover"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" style={{ marginRight: '4px' }}>
+                    <path fill="#EA4335" d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.114-5.136 4.114A5.53 5.53 0 0 1 8.4 13a5.53 5.53 0 0 1 5.59-5.514c2.19 0 3.91.815 5.12 1.954l3.21-3.21C20.39 4.352 17.48 3 14 3a10 10 0 0 0-10 10 10 0 0 0 10 10c5.52 0 10-4.48 10-10 0-.675-.06-1.32-.176-1.943l-9.584.228z"/>
+                  </svg>
+                  Continue with Google
+                </button>
+              )}
+
+              {/* Tab Selection: Sign In vs Register */}
+              <div style={{
                 display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '10px',
-                cursor: 'pointer',
-                marginBottom: '24px',
-                transition: 'var(--transition)'
-              }}
-              className="btn-outline-hover"
-            >
-              {/* Simple Mock Google Icon */}
-              <svg width="18" height="18" viewBox="0 0 24 24" style={{ marginRight: '4px' }}>
-                <path fill="#EA4335" d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.114-5.136 4.114A5.53 5.53 0 0 1 8.4 13a5.53 5.53 0 0 1 5.59-5.514c2.19 0 3.91.815 5.12 1.954l3.21-3.21C20.39 4.352 17.48 3 14 3a10 10 0 0 0-10 10 10 0 0 0 10 10c5.52 0 10-4.48 10-10 0-.675-.06-1.32-.176-1.943l-9.584.228z"/>
-              </svg>
-              Continue with Google
-            </button>
+                borderBottom: '2px solid var(--border-color)',
+                marginBottom: '20px'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => { setIsLoginTab(true); setError(''); }}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    background: 'none',
+                    border: 'none',
+                    borderBottom: isLoginTab ? '3px solid var(--primary)' : '3px solid transparent',
+                    color: isLoginTab ? 'var(--primary)' : 'var(--text-muted)',
+                    fontWeight: isLoginTab ? '700' : '500',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    transition: 'var(--transition)'
+                  }}
+                >
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setIsLoginTab(false); setError(''); }}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    background: 'none',
+                    border: 'none',
+                    borderBottom: !isLoginTab ? '3px solid var(--primary)' : '3px solid transparent',
+                    color: !isLoginTab ? 'var(--primary)' : 'var(--text-muted)',
+                    fontWeight: !isLoginTab ? '700' : '500',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    transition: 'var(--transition)'
+                  }}
+                >
+                  Register
+                </button>
+              </div>
+
+              {/* Role selector cards (available for selection) */}
+              <div style={{ marginBottom: '24px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div
+                    onClick={() => {
+                      handleRoleSelect('seeker');
+                      handlePrefill('seeker');
+                    }}
+                    style={{
+                      border: formData.role === 'seeker' ? '2px solid #10b981' : '1.5px solid var(--border-color)',
+                      backgroundColor: formData.role === 'seeker' ? '#f0fdf4' : 'white',
+                      borderRadius: '10px',
+                      padding: '14px',
+                      cursor: 'pointer',
+                      transition: 'var(--transition)',
+                      textAlign: 'left'
+                    }}
+                  >
+                    <div style={{ fontWeight: '700', fontSize: '14px', color: '#10b981' }}>Job Seeker</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: '1.3' }}>For fresher graphic / UI-UX designers.</div>
+                  </div>
+
+                  <div
+                    onClick={() => {
+                      handleRoleSelect('recruiter');
+                      handlePrefill('recruiter');
+                    }}
+                    style={{
+                      border: formData.role === 'recruiter' ? '2px solid #10b981' : '1.5px solid var(--border-color)',
+                      backgroundColor: formData.role === 'recruiter' ? '#f0fdf4' : 'white',
+                      borderRadius: '10px',
+                      padding: '14px',
+                      cursor: 'pointer',
+                      transition: 'var(--transition)',
+                      textAlign: 'left'
+                    }}
+                  >
+                    <div style={{ fontWeight: '700', fontSize: '14px', color: '#059669' }}>Hiring Manager</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: '1.3' }}>Post designer roles in minutes.</div>
+                  </div>
+                </div>
+              </div>
+            </>
           )}
-
-          {/* Tab Selection: Sign In vs Register */}
-          <div style={{
-            display: 'flex',
-            borderBottom: '2px solid var(--border-color)',
-            marginBottom: '20px'
-          }}>
-            <button
-              type="button"
-              onClick={() => { setIsLoginTab(true); setError(''); }}
-              style={{
-                flex: 1,
-                padding: '10px',
-                background: 'none',
-                border: 'none',
-                borderBottom: isLoginTab ? '3px solid var(--primary)' : '3px solid transparent',
-                color: isLoginTab ? 'var(--primary)' : 'var(--text-muted)',
-                fontWeight: isLoginTab ? '700' : '500',
-                cursor: 'pointer',
-                fontSize: '14px',
-                transition: 'var(--transition)'
-              }}
-            >
-              Sign In
-            </button>
-            <button
-              type="button"
-              onClick={() => { setIsLoginTab(false); setError(''); }}
-              style={{
-                flex: 1,
-                padding: '10px',
-                background: 'none',
-                border: 'none',
-                borderBottom: !isLoginTab ? '3px solid var(--primary)' : '3px solid transparent',
-                color: !isLoginTab ? 'var(--primary)' : 'var(--text-muted)',
-                fontWeight: !isLoginTab ? '700' : '500',
-                cursor: 'pointer',
-                fontSize: '14px',
-                transition: 'var(--transition)'
-              }}
-            >
-              Register
-            </button>
-          </div>
-
-          {/* Role selector cards (available for selection) */}
-          <div style={{ marginBottom: '24px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              {/* Seeker Option Card */}
-              <div
-                onClick={() => {
-                  handleRoleSelect('seeker');
-                  handlePrefill('seeker');
-                }}
-                style={{
-                  border: formData.role === 'seeker' ? '2px solid #10b981' : '1.5px solid var(--border-color)',
-                  backgroundColor: formData.role === 'seeker' ? '#f0fdf4' : 'white',
-                  borderRadius: '10px',
-                  padding: '14px',
-                  cursor: 'pointer',
-                  transition: 'var(--transition)',
-                  textAlign: 'left'
-                }}
-              >
-                <div style={{ fontWeight: '700', fontSize: '14px', color: '#10b981' }}>Job Seeker</div>
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: '1.3' }}>For fresher graphic / UI-UX designers.</div>
-              </div>
-
-              {/* Recruiter Option Card */}
-              <div
-                onClick={() => {
-                  handleRoleSelect('recruiter');
-                  handlePrefill('recruiter');
-                }}
-                style={{
-                  border: formData.role === 'recruiter' ? '2px solid #10b981' : '1.5px solid var(--border-color)',
-                  backgroundColor: formData.role === 'recruiter' ? '#f0fdf4' : 'white',
-                  borderRadius: '10px',
-                  padding: '14px',
-                  cursor: 'pointer',
-                  transition: 'var(--transition)',
-                  textAlign: 'left'
-                }}
-              >
-                <div style={{ fontWeight: '700', fontSize: '14px', color: '#059669' }}>Hiring Manager</div>
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: '1.3' }}>Post designer roles in minutes.</div>
-              </div>
-            </div>
-          </div>
 
           {/* Error message */}
           {error && (
@@ -431,62 +586,163 @@ const Auth = ({ login, user }) => {
             </div>
           )}
 
-          {/* Login/Register Inputs Form */}
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {!isLoginTab && (
+          {verificationData ? (
+            /* OTP Verification Inputs Form */
+            <form onSubmit={handleVerifyOtp} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              
+              {/* Development Mode Helper */}
+              {verificationData.devHelper && (
+                <div style={{
+                  backgroundColor: '#eff6ff',
+                  border: '1px solid #bfdbfe',
+                  color: '#1e40af',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  marginBottom: '6px',
+                  textAlign: 'left'
+                }}>
+                  <strong style={{ display: 'block', marginBottom: '4px' }}>Development Mode OTPs:</strong>
+                  <div>Email OTP: <code style={{ fontWeight: 'bold', fontSize: '14px' }}>{verificationData.devHelper.emailOtp}</code></div>
+                  <div>Mobile OTP: <code style={{ fontWeight: 'bold', fontSize: '14px' }}>{verificationData.devHelper.mobileOtp}</code></div>
+                </div>
+              )}
+
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Full Name</label>
+                <label className="form-label">Email OTP</label>
                 <input
                   type="text"
-                  name="name"
+                  required
+                  maxLength={6}
+                  placeholder="Enter 6-digit Email OTP"
+                  className="form-control"
+                  value={emailOtp}
+                  onChange={(e) => setEmailOtp(e.target.value)}
+                  style={{ borderRadius: '8px', letterSpacing: '2px', textAlign: 'center', fontWeight: 'bold' }}
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 10 }}>
+                <label className="form-label">Mobile OTP</label>
+                <input
+                  type="text"
+                  required
+                  maxLength={6}
+                  placeholder="Enter 6-digit Mobile OTP"
+                  className="form-control"
+                  value={mobileOtp}
+                  onChange={(e) => setMobileOtp(e.target.value)}
+                  style={{ borderRadius: '8px', letterSpacing: '2px', textAlign: 'center', fontWeight: 'bold' }}
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={verifying}
+                className="btn btn-primary"
+                style={{ width: '100%', padding: '12px', fontSize: '15px', borderRadius: '8px', cursor: 'pointer' }}
+              >
+                {verifying ? 'Verifying...' : 'Verify OTP & Log In'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setVerificationData(null);
+                  setError('');
+                }}
+                className="btn btn-secondary"
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  fontSize: '14px',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  background: 'none',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-main)'
+                }}
+              >
+                Go Back
+              </button>
+            </form>
+          ) : (
+            /* Normal Login/Register Form */
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {!isLoginTab && (
+                <>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Full Name</label>
+                    <input
+                      type="text"
+                      name="name"
+                      required
+                      className="form-control"
+                      placeholder="e.g. John Doe"
+                      value={formData.name}
+                      onChange={handleChange}
+                      style={{ borderRadius: '8px' }}
+                    />
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Mobile Number</label>
+                    <input
+                      type="tel"
+                      name="mobile"
+                      required
+                      className="form-control"
+                      placeholder="e.g. +91 98765 43210"
+                      value={formData.mobile}
+                      onChange={handleChange}
+                      style={{ borderRadius: '8px' }}
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Email Address</label>
+                <input
+                  type="email"
+                  name="email"
                   required
                   className="form-control"
-                  placeholder="e.g. John Doe"
-                  value={formData.name}
+                  placeholder="you@example.com"
+                  value={formData.email}
                   onChange={handleChange}
                   style={{ borderRadius: '8px' }}
                 />
               </div>
-            )}
 
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">Email Address</label>
-              <input
-                type="email"
-                name="email"
-                required
-                className="form-control"
-                placeholder="you@example.com"
-                value={formData.email}
-                onChange={handleChange}
-                style={{ borderRadius: '8px' }}
-              />
-            </div>
+              <div className="form-group" style={{ marginBottom: 10 }}>
+                <label className="form-label">Password</label>
+                <input
+                  type="password"
+                  name="password"
+                  required
+                  minLength={6}
+                  className="form-control"
+                  placeholder="••••••••"
+                  value={formData.password}
+                  onChange={handleChange}
+                  onFocus={() => setIsPasswordFocused(true)}
+                  onBlur={() => setIsPasswordFocused(false)}
+                  style={{ borderRadius: '8px' }}
+                />
+              </div>
 
-            <div className="form-group" style={{ marginBottom: 10 }}>
-              <label className="form-label">Password</label>
-              <input
-                type="password"
-                name="password"
-                required
-                minLength={6}
-                className="form-control"
-                placeholder="••••••••"
-                value={formData.password}
-                onChange={handleChange}
-                style={{ borderRadius: '8px' }}
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn btn-primary"
-              style={{ width: '100%', padding: '12px', fontSize: '15px', borderRadius: '8px', cursor: 'pointer' }}
-            >
-              {loading ? 'Processing...' : isLoginTab ? 'Sign In' : 'Register Account'}
-            </button>
-          </form>
+              <button
+                type="submit"
+                disabled={loading}
+                className="btn btn-primary"
+                onMouseDown={() => setIsPasswordFocused(false)}
+                style={{ width: '100%', padding: '12px', fontSize: '15px', borderRadius: '8px', cursor: 'pointer' }}
+              >
+                {loading ? 'Processing...' : isLoginTab ? 'Sign In' : 'Register Account'}
+              </button>
+            </form>
+          )}
 
           {/* Fine print policy */}
           <div style={{ fontSize: '11px', color: 'var(--text-light)', marginTop: '20px', textAlign: 'center' }}>

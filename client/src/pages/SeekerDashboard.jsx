@@ -18,10 +18,21 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
   const [skillsStr, setSkillsStr] = useState('');
   const [selectedTools, setSelectedTools] = useState([]);
   const [gmail, setGmail] = useState('');
-  const [languagesStr, setLanguagesStr] = useState('');
   const [portfolioUrl, setPortfolioUrl] = useState('');
   const [schooling, setSchooling] = useState('');
   const [workExperience, setWorkExperience] = useState([]);
+  const [aboutThem, setAboutThem] = useState('');
+  const [relocate, setRelocate] = useState(false);
+  const [languagesList, setLanguagesList] = useState([{ language: 'English', fluency: 'Fluent' }]);
+  const [projects, setProjects] = useState([
+    { title: '', description: '', link: '' },
+    { title: '', description: '', link: '' },
+    { title: '', description: '', link: '' },
+    { title: '', description: '', link: '' }
+  ]);
+  
+  // Track Applications popup modal state
+  const [showAppsModal, setShowAppsModal] = useState(false);
   
   // Upload files states
   const [resumeFile, setResumeFile] = useState(null);
@@ -39,13 +50,16 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
     if (gmail.trim()) score += 10;
     if (skillsStr.trim()) score += 10;
     if (selectedTools.length > 0) score += 10;
-    if (languagesStr.trim()) score += 10;
+    if (languagesList.length > 0 && languagesList[0].language.trim()) score += 10;
     if (schooling.trim()) score += 10;
-    if (profile || resumeFile) score += 15;
-    if (profile || photoFile) score += 15;
-    if (profile || workSampleFiles.length === 3) score += 10;
+    if (aboutThem.trim()) score += 10;
+    if (projects.filter(p => p.title.trim()).length === 4) score += 10;
+    if (profile || resumeFile) score += 10;
+    if (profile || photoFile) score += 10;
     return Math.min(score, 100);
   };
+
+  const languagesStr = languagesList.map(l => l.language).filter(Boolean).join(', ');
 
   // Define tools lists
   const graphicTools = ['Photoshop', 'Illustrator', 'CorelDRAW', 'Canva', 'Figma'];
@@ -64,15 +78,42 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
       setSkillsStr(profile.skills ? profile.skills.join(', ') : '');
       setSelectedTools(profile.tools || []);
       setGmail(profile.gmail || '');
-      setLanguagesStr(profile.languages ? profile.languages.join(', ') : '');
       setPortfolioUrl(profile.portfolioUrl || '');
       setSchooling(profile.schooling || '');
       setWorkExperience(profile.workExperience || []);
+      setAboutThem(profile.about_them || profile.aboutThem || '');
+      setRelocate(profile.relocate || false);
+      
+      if (Array.isArray(profile.languages) && profile.languages.length > 0) {
+        setLanguagesList(profile.languages);
+      } else {
+        setLanguagesList([{ language: 'English', fluency: 'Fluent' }]);
+      }
+      
+      if (Array.isArray(profile.portfolioProjects) && profile.portfolioProjects.length >= 4) {
+        setProjects(profile.portfolioProjects);
+      } else {
+        setProjects([
+          { title: '', description: '', link: '' },
+          { title: '', description: '', link: '' },
+          { title: '', description: '', link: '' },
+          { title: '', description: '', link: '' }
+        ]);
+      }
     } else {
       // Default email to user's registered email
       if (user) setGmail(user.email);
       setSchooling('');
       setWorkExperience([]);
+      setAboutThem('');
+      setRelocate(false);
+      setLanguagesList([{ language: 'English', fluency: 'Fluent' }]);
+      setProjects([
+        { title: '', description: '', link: '' },
+        { title: '', description: '', link: '' },
+        { title: '', description: '', link: '' },
+        { title: '', description: '', link: '' }
+      ]);
     }
   }, [profile, user]);
 
@@ -157,6 +198,26 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
     setWorkExperience(updated);
   };
 
+  const handleProjectChange = (idx, field, val) => {
+    const updated = [...projects];
+    updated[idx][field] = val;
+    setProjects(updated);
+  };
+
+  const handleAddLanguage = () => {
+    setLanguagesList([...languagesList, { language: '', fluency: 'Beginner' }]);
+  };
+
+  const handleRemoveLanguage = (idx) => {
+    setLanguagesList(languagesList.filter((_, i) => i !== idx));
+  };
+
+  const handleLanguageChange = (idx, field, val) => {
+    const updated = [...languagesList];
+    updated[idx][field] = val;
+    setLanguagesList(updated);
+  };
+
   const handleSubmitProfile = async (e) => {
     e.preventDefault();
     setFormError('');
@@ -181,6 +242,11 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
       return;
     }
 
+    if (!aboutThem.trim()) {
+      setFormError('Please add a bio in "About Them".');
+      return;
+    }
+
     if (!schooling.trim()) {
       setFormError('Please add your schooling/education details.');
       return;
@@ -189,6 +255,23 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
     for (let exp of workExperience) {
       if (!exp.company.trim() || !exp.role.trim()) {
         setFormError('Please fill out Company Name and Role for all work experiences.');
+        return;
+      }
+    }
+
+    // Validate 4 projects
+    for (let i = 0; i < 4; i++) {
+      const p = projects[i];
+      if (!p.title.trim() || !p.description.trim() || !p.link.trim()) {
+        setFormError(`Please fill in all details for Project #${i + 1}.`);
+        return;
+      }
+    }
+
+    // Validate languages
+    for (let i = 0; i < languagesList.length; i++) {
+      if (!languagesList[i].language.trim()) {
+        setFormError(`Please enter a name for Language #${i + 1}.`);
         return;
       }
     }
@@ -209,6 +292,29 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
       }
     }
 
+    // Client-side file size and type validations
+    if (photoFile) {
+      if (photoFile.size > 2 * 1024 * 1024) {
+        setFormError('Profile photo must be less than 2MB in size!');
+        return;
+      }
+      if (!/\.(jpg|jpeg)$/i.test(photoFile.name)) {
+        setFormError('Profile photo must be a JPG or JPEG file only!');
+        return;
+      }
+    }
+
+    if (resumeFile) {
+      if (resumeFile.size > 1 * 1024 * 1024) {
+        setFormError('Resume PDF must be less than 1MB in size!');
+        return;
+      }
+      if (!/\.pdf$/i.test(resumeFile.name)) {
+        setFormError('Resume must be a PDF file only!');
+        return;
+      }
+    }
+
     // Create Form Data payload
     const formData = new FormData();
     formData.append('fullName', fullName);
@@ -218,10 +324,13 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
     formData.append('skills', skillsStr);
     formData.append('tools', selectedTools.join(','));
     formData.append('gmail', gmail);
-    formData.append('languages', languagesStr);
+    formData.append('languages', JSON.stringify(languagesList));
     formData.append('portfolioUrl', portfolioUrl);
     formData.append('schooling', schooling);
     formData.append('workExperience', JSON.stringify(workExperience));
+    formData.append('aboutThem', aboutThem);
+    formData.append('portfolioProjects', JSON.stringify(projects));
+    formData.append('relocate', relocate);
 
     if (resumeFile) formData.append('resume', resumeFile);
     if (photoFile) formData.append('photo', photoFile);
@@ -261,8 +370,9 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
 
   const getStatusBadge = (status) => {
     switch (status) {
+      case 'cracked':
       case 'accepted':
-        return <span className="badge badge-success" style={{ fontWeight: 'bold' }}>ACCEPTED (HR Selected)</span>;
+        return <span className="badge badge-success" style={{ fontWeight: 'bold' }}>🎉 CRACKED (Hired)</span>;
       case 'rejected':
         return <span className="badge badge-error">Rejected</span>;
       default:
@@ -440,7 +550,7 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
 
               {/* Tools Multi-Select */}
               <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                <label className="form-label">Software/Tools Known (Select all that apply)</label>
+                <label className="form-label">Software/Tools Used (Select all that apply)</label>
                 <div className="checkbox-group">
                   {currentToolsList.map((tool) => (
                     <label key={tool} className="checkbox-label card" style={{
@@ -464,34 +574,22 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
                 </div>
               </div>
 
-              {/* Languages */}
-              <div className="form-group">
-                <label className="form-label">Languages Known (Comma separated)</label>
-                <input
-                  type="text"
+              {/* About Them */}
+              <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                <label className="form-label">About Me / Bio (Required)</label>
+                <textarea
                   required
+                  rows={3}
                   className="form-control"
-                  value={languagesStr}
-                  onChange={(e) => setLanguagesStr(e.target.value)}
-                  placeholder="e.g. English, Hindi, Spanish"
-                />
-              </div>
-
-              {/* Website URL */}
-              <div className="form-group">
-                <label className="form-label">Portfolio Website URL (Optional)</label>
-                <input
-                  type="url"
-                  className="form-control"
-                  value={portfolioUrl}
-                  onChange={(e) => setPortfolioUrl(e.target.value)}
-                  placeholder="https://myportfolio.com"
+                  value={aboutThem}
+                  onChange={(e) => setAboutThem(e.target.value)}
+                  placeholder="Tell hiring managers about your design style, background, and passion..."
                 />
               </div>
 
               {/* Schooling Details */}
               <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                <label className="form-label">Schooling / Education Details (Required)</label>
+                <label className="form-label">Schooling / Education Degree details (Required)</label>
                 <textarea
                   required
                   rows={2}
@@ -502,10 +600,136 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
                 />
               </div>
 
+              {/* Website URL */}
+              <div className="form-group">
+                <label className="form-label">Portfolio / Website Link (Optional)</label>
+                <input
+                  type="url"
+                  className="form-control"
+                  value={portfolioUrl}
+                  onChange={(e) => setPortfolioUrl(e.target.value)}
+                  placeholder="https://myportfolio.com"
+                />
+              </div>
+
+              {/* Relocation Checkbox */}
+              <div className="form-group" style={{ display: 'flex', alignItems: 'center' }}>
+                <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginTop: '30px' }}>
+                  <input
+                    type="checkbox"
+                    checked={relocate}
+                    onChange={(e) => setRelocate(e.target.checked)}
+                  />
+                  <span>Open to Relocate?</span>
+                </label>
+              </div>
+
+              {/* Languages Builder */}
+              <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <label className="form-label" style={{ marginBottom: 0 }}>Languages Known *</label>
+                  <button
+                    type="button"
+                    onClick={handleAddLanguage}
+                    className="btn btn-secondary"
+                    style={{ padding: '4px 10px', fontSize: '12px' }}
+                  >
+                    + Add Language
+                  </button>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {languagesList.map((lang, idx) => (
+                    <div key={idx} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Language (e.g. English)"
+                        className="form-control"
+                        value={lang.language}
+                        onChange={(e) => handleLanguageChange(idx, 'language', e.target.value)}
+                        style={{ flex: 2, padding: '8px 12px', fontSize: '13px' }}
+                      />
+                      <select
+                        className="form-control"
+                        value={lang.fluency}
+                        onChange={(e) => handleLanguageChange(idx, 'fluency', e.target.value)}
+                        style={{ flex: 1, padding: '8px 12px', fontSize: '13px' }}
+                      >
+                        <option value="Beginner">Beginner</option>
+                        <option value="Intermediate">Intermediate</option>
+                        <option value="Fluent">Fluent</option>
+                      </select>
+                      {languagesList.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveLanguage(idx)}
+                          className="btn btn-danger"
+                          style={{ padding: '8px', borderRadius: '4px', border: 'none', cursor: 'pointer' }}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Top 4 Projects Builder */}
+              <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                <h3 style={{ fontSize: '16px', color: 'var(--text-main)', marginBottom: '12px', fontWeight: 'bold' }}>
+                  Top 4 Projects (All 4 Required)
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {projects.map((proj, idx) => (
+                    <div key={idx} className="card" style={{ padding: '16px', backgroundColor: '#fafbfc', border: '1px solid var(--border-color)' }}>
+                      <h4 style={{ fontSize: '14px', marginBottom: '12px', color: 'var(--text-main)', fontWeight: 'bold' }}>Project #{idx + 1}</h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }} className="form-grid-2">
+                        <div className="form-group" style={{ marginBottom: '10px' }}>
+                          <label className="form-label" style={{ fontSize: '12px' }}>Project Title *</label>
+                          <input
+                            type="text"
+                            required
+                            className="form-control"
+                            style={{ padding: '8px 12px', fontSize: '13px' }}
+                            value={proj.title}
+                            onChange={(e) => handleProjectChange(idx, 'title', e.target.value)}
+                            placeholder="e.g. Mobile E-commerce UX Case Study"
+                          />
+                        </div>
+                        <div className="form-group" style={{ marginBottom: '10px' }}>
+                          <label className="form-label" style={{ fontSize: '12px' }}>Project Link *</label>
+                          <input
+                            type="url"
+                            required
+                            className="form-control"
+                            style={{ padding: '8px 12px', fontSize: '13px' }}
+                            value={proj.link}
+                            onChange={(e) => handleProjectChange(idx, 'link', e.target.value)}
+                            placeholder="https://behance.net/..."
+                          />
+                        </div>
+                        <div className="form-group" style={{ gridColumn: 'span 2', marginBottom: 0 }}>
+                          <label className="form-label" style={{ fontSize: '12px' }}>Project Description *</label>
+                          <textarea
+                            required
+                            rows={2}
+                            className="form-control"
+                            style={{ padding: '8px 12px', fontSize: '13px' }}
+                            value={proj.description}
+                            onChange={(e) => handleProjectChange(idx, 'description', e.target.value)}
+                            placeholder="Briefly describe your design process, research, and outputs..."
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               {/* Work Experience dynamic list builder */}
               <div className="form-group" style={{ gridColumn: 'span 2' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                  <label className="form-label" style={{ marginBottom: 0 }}>Work Experience (Max 3, optional)</label>
+                  <label className="form-label" style={{ marginBottom: 0 }}>Previous Internships / Work Experience (Max 3, optional)</label>
                   {workExperience.length < 3 && (
                     <button
                       type="button"
@@ -521,7 +745,7 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   {workExperience.length === 0 ? (
                     <div style={{ padding: '16px', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-sm)', textAlign: 'center', color: 'var(--text-light)', fontSize: '13px' }}>
-                      No work experience added yet. Click "Add Experience" to add one.
+                      No prior work experience added.
                     </div>
                   ) : (
                     workExperience.map((exp, index) => (
@@ -538,7 +762,6 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
                         <h4 style={{ fontSize: '14px', marginBottom: '12px', color: 'var(--text-main)', fontWeight: 'bold' }}>Experience #{index + 1}</h4>
                         
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }} className="form-grid-2">
-                          {/* Company */}
                           <div className="form-group" style={{ marginBottom: '10px' }}>
                             <label className="form-label" style={{ fontSize: '12px' }}>Company Name *</label>
                             <input
@@ -552,7 +775,6 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
                             />
                           </div>
                           
-                          {/* Role */}
                           <div className="form-group" style={{ marginBottom: '10px' }}>
                             <label className="form-label" style={{ fontSize: '12px' }}>Role / Designation *</label>
                             <input
@@ -566,7 +788,6 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
                             />
                           </div>
                           
-                          {/* From Month & Year */}
                           <div className="form-group" style={{ marginBottom: '10px' }}>
                             <label className="form-label" style={{ fontSize: '12px' }}>From Date *</label>
                             <div style={{ display: 'flex', gap: '6px' }}>
@@ -589,7 +810,6 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
                             </div>
                           </div>
                           
-                          {/* To Month & Year */}
                           <div className="form-group" style={{ marginBottom: '10px' }}>
                             <label className="form-label" style={{ fontSize: '12px' }}>To Date *</label>
                             <div style={{ display: 'flex', gap: '6px' }}>
@@ -612,7 +832,6 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
                             </div>
                           </div>
                           
-                          {/* Description */}
                           <div className="form-group" style={{ gridColumn: 'span 2', marginBottom: 0 }}>
                             <label className="form-label" style={{ fontSize: '12px' }}>Description / Responsibilities</label>
                             <textarea
@@ -633,7 +852,7 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
 
               {/* Resume File */}
               <div className="form-group">
-                <label className="form-label">Upload Resume (PDF only {profile && '(Leave blank to keep current)'})</label>
+                <label className="form-label">Upload Resume PDF (PDF only, max 1MB {profile && '(Leave blank to keep current)'})</label>
                 <input
                   type="file"
                   accept="application/pdf"
@@ -645,14 +864,17 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
 
               {/* Profile Photo */}
               <div className="form-group">
-                <label className="form-label">Profile Photo (Image {profile && '(Leave blank to keep current)'})</label>
+                <label className="form-label">Profile Photo (JPG/JPEG only, max 2MB, "neat & clean" {profile && '(Leave blank to keep current)'})</label>
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/jpeg,image/jpg"
                   required={!profile}
                   className="form-control"
                   onChange={(e) => setPhotoFile(e.target.files[0])}
                 />
+                <small style={{ color: 'var(--text-light)', display: 'block', marginTop: '4px' }}>
+                  Please upload a neat, clean and professional headshot.
+                </small>
               </div>
 
               {/* Work Samples (3 images required) */}
@@ -719,6 +941,11 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
 
             <div style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '14px', borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
               <div>
+                <strong style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase' }}>About Me</strong>
+                <span style={{ display: 'block', whiteSpace: 'pre-line', lineHeight: '1.4' }}>{profile.about_them || profile.aboutThem}</span>
+              </div>
+              
+              <div>
                 <strong style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase' }}>Experience</strong>
                 <span style={{ fontWeight: '600' }}>{profile.experienceValue} {profile.experienceType} (Fresher)</span>
               </div>
@@ -730,7 +957,11 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
 
               <div>
                 <strong style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase' }}>Languages Known</strong>
-                <span>{profile.languages.join(', ')}</span>
+                <span>
+                  {Array.isArray(profile.languages) 
+                    ? profile.languages.map(l => `${l.language} (${l.fluency})`).join(', ')
+                    : String(profile.languages)}
+                </span>
               </div>
 
               {profile.portfolioUrl && (
@@ -741,6 +972,11 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
                   </a>
                 </div>
               )}
+
+              <div>
+                <strong style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase' }}>Open to Relocate?</strong>
+                <span>{profile.relocate ? '✅ Yes, willing to relocate' : '❌ No'}</span>
+              </div>
 
               <div>
                 <strong style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase' }}>Schooling / Education Details</strong>
@@ -789,6 +1025,49 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
         {/* Right Column: Applications Tracker & Action block */}
         <div>
           
+          {/* Track Applications Modal Trigger Card */}
+          <div className="card" style={{ marginBottom: '30px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 30px' }}>
+            <div>
+              <h3 style={{ fontSize: '18px', color: 'var(--text-main)', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <BookOpen size={18} style={{ color: 'var(--primary)' }} />
+                Application History
+              </h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: 0 }}>
+                You have applied to {applications.length} jobs.
+              </p>
+            </div>
+            <button 
+              onClick={() => setShowAppsModal(true)} 
+              className="btn btn-primary"
+              style={{ padding: '10px 20px', fontSize: '14px' }}
+            >
+              Track Applications
+            </button>
+          </div>
+
+          {/* Top 4 Portfolio Projects Grid */}
+          <div className="card" style={{ marginBottom: '30px' }}>
+            <h3 style={{ fontSize: '18px', color: 'var(--text-main)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Globe size={18} style={{ color: 'var(--accent)' }} />
+              Top 4 Portfolio Projects
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+              {profile.portfolioProjects && profile.portfolioProjects.map((proj, idx) => (
+                <div key={idx} className="card" style={{ padding: '16px', backgroundColor: '#fafbfc', border: '1px solid var(--border-color)' }}>
+                  <h4 style={{ fontSize: '15px', color: 'var(--text-main)', margin: '0 0 6px 0', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    {proj.title}
+                    <a href={proj.link} target="_blank" rel="noopener noreferrer" style={{ fontSize: '12px', color: 'var(--accent)', fontWeight: 'bold' }}>
+                      Link ↗
+                    </a>
+                  </h4>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: 0, lineHeight: '1.4' }}>
+                    {proj.description}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+          
           {/* Work samples Gallery Grid */}
           <div className="card" style={{ marginBottom: '30px' }}>
             <h3 style={{ fontSize: '18px', color: 'var(--text-main)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -831,56 +1110,80 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
             </div>
           </div>
 
-          {/* Applications list */}
-          <div className="card">
-            <h3 style={{ fontSize: '20px', color: 'var(--text-main)', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <BookOpen size={20} style={{ color: 'var(--primary)' }} />
-              Track Applications ({applications.length})
-            </h3>
+        </div>
+
+      </div>
+
+      {/* Track Applications Pop-up Modal */}
+      {showAppsModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 2000,
+          padding: '20px'
+        }} onClick={() => setShowAppsModal(false)}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: 'var(--radius-lg)',
+            width: '100%',
+            maxWidth: '650px',
+            maxHeight: '85vh',
+            overflowY: 'auto',
+            padding: '30px',
+            position: 'relative'
+          }} onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setShowAppsModal(false)}
+              style={{ position: 'absolute', top: '20px', right: '20px', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '18px' }}
+            >
+              ✕
+            </button>
+            <h2 style={{ fontSize: '22px', color: 'var(--text-main)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Clock size={20} style={{ color: 'var(--primary)' }} />
+              Track Applications
+            </h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '20px' }}>
+              Monitor the status of your submitted job applications.
+            </p>
 
             {loadingApps ? (
-              <div style={{ textAlign: 'center', padding: '30px 0' }}>Loading application history...</div>
+              <div style={{ textAlign: 'center', padding: '30px 0' }}>Loading applications...</div>
             ) : applications.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--text-light)' }}>
-                <p>You haven't applied to any jobs yet.</p>
-                <button onClick={() => navigate('/')} className="btn btn-primary" style={{ marginTop: '14px', fontSize: '13px' }}>
-                  Browse Job Listings
-                </button>
+              <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-light)', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+                You haven't applied to any job listings yet.
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {applications.map((app) => (
-                  <div key={app._id} className="card" style={{
-                    padding: '20px',
-                    backgroundColor: '#fafbfc',
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: '16px'
-                  }}>
-                    <div>
-                      <h4 style={{ fontSize: '16px', color: 'var(--text-main)', marginBottom: '4px' }}>
-                        {app.job ? app.job.title : 'Deleted Posting'}
-                      </h4>
-                      <div style={{ display: 'flex', gap: '16px', fontSize: '13px', color: 'var(--text-light)' }}>
-                        <span>Role: {app.job ? app.job.role : 'N/A'}</span>
-                        <span>Applied: {new Date(app.appliedAt).toLocaleDateString()}</span>
+                  <div key={app._id} className="card" style={{ padding: '16px 20px', backgroundColor: '#fafbfc', border: '1px solid var(--border-color)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
+                      <div>
+                        <h4 style={{ fontSize: '15px', color: 'var(--text-main)', margin: 0, fontWeight: 'bold' }}>
+                          {app.job ? app.job.title : 'Position'}
+                        </h4>
+                        <span style={{ fontSize: '13px', color: 'var(--accent)', fontWeight: '600' }}>
+                          {app.job ? app.job.companyName : 'Company'}
+                        </span>
+                      </div>
+                      <div>
+                        {getStatusBadge(app.status)}
                       </div>
                     </div>
-                    
-                    <div>
-                      {getStatusBadge(app.status)}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-light)' }}>
+                      <span>📅 Applied on: {new Date(app.appliedAt).toLocaleDateString()}</span>
+                      <span>📍 {app.job ? app.job.location : ''}</span>
                     </div>
                   </div>
                 ))}
               </div>
             )}
           </div>
-
         </div>
-
-      </div>
+      )}
 
       {/* Visual Lightbox Overlay */}
       {lightboxImage && (

@@ -14,12 +14,45 @@ const Landing = ({ user, profile, refreshMe }) => {
   const [applyLoading, setApplyLoading] = useState(false);
   const [applyMessage, setApplyMessage] = useState({ type: '', text: '' });
   const [mobileView, setMobileView] = useState('list'); // 'list' or 'details'
+  const [acceptedSeekers, setAcceptedSeekers] = useState([]);
 
   const navigate = useNavigate();
 
+  const heroRef = React.useRef(null);
+  const handleMouseMove = (e) => {
+    if (!heroRef.current) return;
+    const { left, top, width, height } = heroRef.current.getBoundingClientRect();
+    const x = (e.clientX - (left + width / 2)) / (width / 2);
+    const y = (e.clientY - (top + height / 2)) / (height / 2);
+    heroRef.current.style.setProperty('--mouse-x', x.toFixed(3));
+    heroRef.current.style.setProperty('--mouse-y', y.toFixed(3));
+  };
+  const handleMouseLeave = () => {
+    if (!heroRef.current) return;
+    heroRef.current.style.setProperty('--mouse-x', '0');
+    heroRef.current.style.setProperty('--mouse-y', '0');
+  };
+
   useEffect(() => {
+    if (user && user.role === 'seeker' && !profile) {
+      navigate('/seeker-dashboard');
+      return;
+    }
     fetchJobs();
-  }, []);
+    fetchAcceptedSeekers();
+  }, [user, profile, navigate]);
+
+  const fetchAcceptedSeekers = async () => {
+    try {
+      const res = await fetch('/api/applications/accepted-seekers');
+      const json = await res.json();
+      if (json.success) {
+        setAcceptedSeekers(json.data);
+      }
+    } catch (err) {
+      console.error('Error fetching accepted seekers:', err);
+    }
+  };
 
   const fetchJobs = async () => {
     try {
@@ -94,150 +127,269 @@ const Landing = ({ user, profile, refreshMe }) => {
     return matchesRole && matchesSearch;
   });
 
+  // Calculate dynamic metrics for Top Tracks card
+  const gdCount = jobs.filter(job => job.role === 'Graphic Designer').length;
+  const uiCount = jobs.filter(job => job.role === 'UI/UX Designer').length;
+  const mgCount = jobs.filter(job => job.role === 'Motion Graphic Designer').length;
+  const maxTrackCount = Math.max(gdCount, uiCount, mgCount, 1);
+  const gdHeight = gdCount > 0 ? (gdCount / maxTrackCount) * 100 : 10;
+  const uiHeight = uiCount > 0 ? (uiCount / maxTrackCount) * 100 : 10;
+  const mgHeight = mgCount > 0 ? (mgCount / maxTrackCount) * 100 : 10;
+
   return (
     <div className="container animate-fade-in" style={{ minHeight: '80vh' }}>
       
-      {/* 1. Hero Grid Section (Screenshot 1 alignment) */}
-      <section style={{
-        display: 'grid',
-        gridTemplateColumns: '1.2fr 1fr',
-        gap: '40px',
-        alignItems: 'center',
-        padding: '50px 0',
-        marginBottom: '40px'
-      }} className="hero-grid-section">
-        {/* Left Column: Badges, Headings, Buttons, Stats */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-          <div style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            backgroundColor: '#ecfdf5',
-            border: '1px solid #a7f3d0',
-            borderRadius: 'var(--radius-full)',
-            padding: '6px 14px',
-            fontSize: '12px',
-            fontWeight: '700',
-            color: '#059669',
-            textTransform: 'uppercase',
-            letterSpacing: '0.5px',
-            marginBottom: '20px'
-          }}>
-            <Sparkles size={13} style={{ fill: '#059669' }} /> Built for fresher designers • 0-12 months
-          </div>
-          
-          <h1 style={{
-            fontSize: '48px',
-            fontWeight: '800',
-            lineHeight: '1.15',
-            color: '#1d2226',
-            fontFamily: 'var(--font-family-display)',
-            marginBottom: '20px',
-            letterSpacing: '-1px'
-          }}>
-            Land your first <span style={{ color: 'var(--primary)' }}>design job</span>.<br />
-            Hire your next <span style={{ color: 'var(--primary)' }}>creative</span>.
-          </h1>
-          
-          <p style={{
-            fontSize: '17px',
-            color: 'var(--text-muted)',
-            lineHeight: '1.6',
-            marginBottom: '32px',
-            maxWidth: '560px'
-          }}>
-            JJ Just Job is a focused portal where <strong>Graphic Designers</strong>, <strong>Motion Graphic Designers</strong>, and <strong>UI/UX Designers</strong> with AI-tool experience meet hiring managers — without the noise.
-          </p>
-          
-          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '40px' }}>
-            <button 
-              onClick={() => navigate('/auth')} 
-              className="btn btn-primary" 
-              style={{ padding: '12px 26px', fontSize: '15px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}
-            >
-              Get started <ChevronRight size={16} />
-            </button>
-            <button 
-              onClick={() => {
-                document.getElementById('jobs-section')?.scrollIntoView({ behavior: 'smooth' });
-              }} 
-              className="btn" 
-              style={{
-                padding: '12px 26px',
-                fontSize: '15px',
-                borderRadius: '8px',
-                backgroundColor: 'white',
-                border: '1px solid var(--border-color)',
-                color: 'var(--text-main)',
-                cursor: 'pointer'
-              }}
-            >
-              Browse jobs
-            </button>
-          </div>
-          
-          {/* Hero Stats */}
-          <div style={{
-            display: 'flex',
-            gap: '40px',
-            flexWrap: 'wrap',
-            borderTop: '1px solid var(--border-color)',
-            paddingTop: '24px',
-            width: '100%'
-          }}>
-            <div>
-              <div style={{ fontSize: '28px', fontWeight: '800', color: '#1d2226', fontFamily: 'var(--font-family-display)' }}>₹12,000+</div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', marginTop: '2px' }}>Avg. Min. Salary</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '28px', fontWeight: '800', color: '#1d2226', fontFamily: 'var(--font-family-display)' }}>3 tracks</div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', marginTop: '2px' }}>Designer roles only</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '28px', fontWeight: '800', color: '#1d2226', fontFamily: 'var(--font-family-display)' }}>12+</div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', marginTop: '2px' }}>AI tools tracked</div>
-            </div>
-          </div>
+      {/* 1. Hero Stack Section (Centered Mockup Design with Smart Parallax) */}
+      <section 
+        ref={heroRef}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          padding: '60px 0 20px 0',
+          marginBottom: '20px',
+          position: 'relative'
+        }} 
+        className="hero-stack-section"
+      >
+        {/* Top Feature Badge */}
+        <div style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '6px',
+          backgroundColor: '#ecfdf5',
+          border: '1px solid #a7f3d0',
+          borderRadius: 'var(--radius-full)',
+          padding: '6px 14px',
+          fontSize: '12px',
+          fontWeight: '700',
+          color: '#059669',
+          textTransform: 'uppercase',
+          letterSpacing: '0.5px',
+          marginBottom: '24px',
+          alignSelf: 'center'
+        }}>
+          <Sparkles size={13} style={{ fill: '#059669' }} /> Built for fresher designers • 0-12 months
         </div>
         
-        {/* Right Column: Illustration with Floating overlay card */}
-        <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center' }} className="hero-illustration-container">
+        {/* Centered Large Display Headline */}
+        <h1 style={{
+          fontSize: '52px',
+          fontWeight: '800',
+          lineHeight: '1.15',
+          color: '#1d2226',
+          fontFamily: 'var(--font-family-display)',
+          marginBottom: '20px',
+          letterSpacing: '-1px',
+          textAlign: 'center',
+          maxWidth: '850px'
+        }}>
+          Land your first <span style={{ color: 'var(--primary)' }}>design job</span>.<br />
+          Hire your next <span style={{ color: 'var(--primary)' }}>creative</span>.
+        </h1>
+        
+        {/* Centered Descriptive Paragraph */}
+        <p style={{
+          fontSize: '17px',
+          color: 'var(--text-muted)',
+          lineHeight: '1.6',
+          marginBottom: '36px',
+          maxWidth: '680px',
+          textAlign: 'center'
+        }}>
+          JJ Just Job is a focused portal where <strong>Graphic Designers</strong>, <strong>Motion Graphic Designers</strong>, and <strong>UI/UX Designers</strong> with AI-tool experience meet hiring managers — without the noise.
+        </p>
+
+        {/* Sleek Centered Pill Search Container (Mockup search style) */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          backgroundColor: 'white',
+          borderRadius: 'var(--radius-full)',
+          padding: '6px 6px 6px 20px',
+          boxShadow: 'var(--shadow-lg)',
+          border: '1px solid var(--border-color)',
+          width: '100%',
+          maxWidth: '650px',
+          marginBottom: '16px',
+          gap: '12px',
+          zIndex: 5
+        }} className="hero-search-bar">
+          <Search size={18} style={{ color: 'var(--text-light)', flexShrink: 0 }} />
+          <input
+            type="text"
+            placeholder="Search jobs by title, area, or tools..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{
+              border: 'none',
+              outline: 'none',
+              flex: '1',
+              fontSize: '15px',
+              color: 'var(--text-main)',
+              background: 'transparent'
+            }}
+          />
+          
+          {/* Vertical divider */}
+          <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--border-color)' }}></div>
+          
+          {/* Dropdown Selector for roleFilter */}
+          <select
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value)}
+            style={{
+              border: 'none',
+              outline: 'none',
+              fontSize: '14px',
+              fontWeight: '600',
+              color: 'var(--text-muted)',
+              backgroundColor: 'transparent',
+              cursor: 'pointer',
+              paddingRight: '12px'
+            }}
+          >
+            <option value="All">All Roles</option>
+            <option value="Graphic Designer">Graphic Designer</option>
+            <option value="UI/UX Designer">UI/UX Designer</option>
+            <option value="Motion Graphic Designer">Motion Graphic Designer</option>
+          </select>
+          
+          <button
+            onClick={() => {
+              document.getElementById('jobs-section')?.scrollIntoView({ behavior: 'smooth' });
+            }}
+            style={{
+              backgroundColor: 'var(--primary)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '50%',
+              width: '40px',
+              height: '40px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              transition: 'var(--transition)'
+            }}
+            className="hero-search-btn"
+          >
+            <Search size={18} />
+          </button>
+        </div>
+
+        {/* Popular/Quick Search Tags (Mockup alignment) */}
+        <div style={{
+          display: 'flex',
+          gap: '12px',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexWrap: 'wrap',
+          fontSize: '13px',
+          color: 'var(--text-muted)',
+          marginBottom: '50px',
+          zIndex: 5
+        }}>
+          <span style={{ fontWeight: '600' }}>Popular Roles:</span>
+          {['All', 'Graphic Designer', 'UI/UX Designer', 'Motion Graphic Designer'].map((role) => (
+            <button
+              key={role}
+              onClick={() => {
+                setRoleFilter(role);
+                document.getElementById('jobs-section')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              style={{
+                border: 'none',
+                background: roleFilter === role ? 'var(--primary-light)' : 'transparent',
+                color: roleFilter === role ? 'var(--primary)' : 'var(--text-main)',
+                padding: '4px 12px',
+                borderRadius: 'var(--radius-full)',
+                cursor: 'pointer',
+                fontWeight: roleFilter === role ? '700' : '500',
+                fontSize: '13px',
+                transition: 'var(--transition)'
+              }}
+              className="popular-tag-btn"
+            >
+              {role}
+            </button>
+          ))}
+        </div>
+
+        {/* Centered Graphic Parallax Container */}
+        <div style={{
+          position: 'relative',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          width: '100%',
+          maxWidth: '850px',
+          height: '480px',
+          margin: '0 auto',
+          padding: '20px',
+          overflow: 'visible'
+        }} className="hero-illustration-parallax">
+          
+          {/* Curved SVG overlay background underlay */}
+          <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }} viewBox="0 0 850 480">
+            <path d="M 100 200 Q 250 120 280 260" fill="none" stroke="var(--border-color)" strokeWidth="2.5" strokeDasharray="8,8" opacity="0.5" />
+            <path d="M 750 200 Q 600 120 570 260" fill="none" stroke="var(--border-color)" strokeWidth="2.5" strokeDasharray="8,8" opacity="0.5" />
+          </svg>
+
+          {/* Radial gradient background light glow */}
           <div style={{
+            position: 'absolute',
+            width: '480px',
+            height: '380px',
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(10, 102, 194, 0.16) 0%, rgba(15, 118, 110, 0.04) 55%, rgba(255,255,255,0) 75%)',
+            zIndex: 1,
+            transform: 'translate(calc(var(--mouse-x, 0) * 15px), calc(var(--mouse-y, 0) * 15px))',
+            transition: 'transform 0.25s cubic-bezier(0.25, 1, 0.5, 1)'
+          }}></div>
+
+          {/* Center 3D Character Illustration */}
+          <div style={{
+            zIndex: 2,
             width: '100%',
-            maxWidth: '460px',
-            borderRadius: 'var(--radius-lg)',
-            overflow: 'hidden',
-            backgroundColor: '#ffffff',
-            boxShadow: 'var(--shadow-lg)',
-            border: '1px solid var(--border-color)',
-            padding: '20px'
-          }}>
+            maxWidth: '380px',
+            transform: 'translate(calc(var(--mouse-x, 0) * 12px), calc(var(--mouse-y, 0) * 12px))',
+            transition: 'transform 0.25s cubic-bezier(0.25, 1, 0.5, 1)'
+          }} className="hero-main-character">
             <img 
               src={heroImg} 
-              alt="Design Desk Illustration" 
-              style={{ width: '100%', height: 'auto', display: 'block', borderRadius: 'var(--radius-md)' }} 
+              alt="Design Professional Illustration" 
+              style={{ 
+                width: '100%', 
+                height: 'auto', 
+                display: 'block',
+                filter: 'drop-shadow(0 25px 50px rgba(0,0,0,0.12))'
+              }} 
             />
           </div>
           
-          {/* Floating Application Received Card */}
+          {/* FLOATING BADGE 1: Application Received (Left Upper) */}
           <div style={{
             position: 'absolute',
-            bottom: '10px',
-            left: '-20px',
+            top: '15%',
+            left: '3%',
             backgroundColor: 'white',
             border: '1px solid var(--border-color)',
-            boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
+            boxShadow: 'var(--shadow-lg)',
             borderRadius: '16px',
-            padding: '16px 20px',
+            padding: '12px 18px',
             display: 'flex',
             alignItems: 'center',
-            gap: '12px',
+            gap: '10px',
             zIndex: 10,
-            animation: 'float 4s ease-in-out infinite'
+            transform: 'translate(calc(var(--mouse-x, 0) * -22px), calc(var(--mouse-y, 0) * -22px))',
+            transition: 'transform 0.2s cubic-bezier(0.25, 1, 0.5, 1)'
           }} className="floating-card">
             <div style={{
-              width: '36px',
-              height: '36px',
+              width: '32px',
+              height: '32px',
               borderRadius: '50%',
               backgroundColor: '#ecfdf5',
               display: 'flex',
@@ -246,14 +398,274 @@ const Landing = ({ user, profile, refreshMe }) => {
               color: '#10b981',
               flexShrink: 0
             }}>
-              <CheckCircle2 size={20} />
+              <CheckCircle2 size={16} />
             </div>
-            <div>
-              <div style={{ fontSize: '14px', fontWeight: '800', color: '#1d2226' }}>Application received</div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>UI/UX Designer • Bengaluru</div>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontSize: '13px', fontWeight: '800', color: '#1d2226' }}>Application received</div>
+              <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '1px' }}>UI/UX Designer • Bengaluru</div>
             </div>
           </div>
+
+          {/* FLOATING BADGE 2: Top Tracks Chart (Left Lower) */}
+          <div style={{
+            position: 'absolute',
+            bottom: '12%',
+            left: '1%',
+            backgroundColor: 'white',
+            border: '1px solid var(--border-color)',
+            boxShadow: 'var(--shadow-lg)',
+            borderRadius: '16px',
+            padding: '16px',
+            width: '180px',
+            zIndex: 10,
+            transform: 'translate(calc(var(--mouse-x, 0) * -16px), calc(var(--mouse-y, 0) * -16px))',
+            transition: 'transform 0.2s cubic-bezier(0.25, 1, 0.5, 1)'
+          }} className="floating-card">
+            <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px', textAlign: 'left' }}>Top Tracks</div>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', height: '60px', paddingBottom: '4px' }}>
+              <div style={{ flex: 1, backgroundColor: 'var(--primary)', height: `${gdHeight}%`, borderRadius: '3px 3px 0 0', position: 'relative', transition: 'height 0.4s ease-out' }} title={`Graphic Design: ${gdCount} jobs`}>
+                <span style={{ position: 'absolute', bottom: '-16px', left: '50%', transform: 'translateX(-50%)', fontSize: '9px', fontWeight: 'bold' }}>GD</span>
+                {gdCount > 0 && <span style={{ position: 'absolute', top: '-14px', left: '50%', transform: 'translateX(-50%)', fontSize: '8px', fontWeight: '800', color: 'var(--primary)' }}>{gdCount}</span>}
+              </div>
+              <div style={{ flex: 1, backgroundColor: 'var(--accent)', height: `${uiHeight}%`, borderRadius: '3px 3px 0 0', position: 'relative', transition: 'height 0.4s ease-out' }} title={`UI/UX Design: ${uiCount} jobs`}>
+                <span style={{ position: 'absolute', bottom: '-16px', left: '50%', transform: 'translateX(-50%)', fontSize: '9px', fontWeight: 'bold' }}>UI</span>
+                {uiCount > 0 && <span style={{ position: 'absolute', top: '-14px', left: '50%', transform: 'translateX(-50%)', fontSize: '8px', fontWeight: '800', color: 'var(--accent)' }}>{uiCount}</span>}
+              </div>
+              <div style={{ flex: 1, backgroundColor: '#ea580c', height: `${mgHeight}%`, borderRadius: '3px 3px 0 0', position: 'relative', transition: 'height 0.4s ease-out' }} title={`Motion Graphics: ${mgCount} jobs`}>
+                <span style={{ position: 'absolute', bottom: '-16px', left: '50%', transform: 'translateX(-50%)', fontSize: '9px', fontWeight: 'bold' }}>MG</span>
+                {mgCount > 0 && <span style={{ position: 'absolute', top: '-14px', left: '50%', transform: 'translateX(-50%)', fontSize: '8px', fontWeight: '800', color: '#ea580c' }}>{mgCount}</span>}
+              </div>
+            </div>
+          </div>
+
+          {/* FLOATING BADGE 3: Avg Min Salary (Right Upper) */}
+          <div style={{
+            position: 'absolute',
+            top: '18%',
+            right: '2%',
+            backgroundColor: 'white',
+            border: '1px solid var(--border-color)',
+            boxShadow: 'var(--shadow-lg)',
+            borderRadius: '16px',
+            padding: '12px 18px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            zIndex: 10,
+            transform: 'translate(calc(var(--mouse-x, 0) * 28px), calc(var(--mouse-y, 0) * 28px))',
+            transition: 'transform 0.22s cubic-bezier(0.25, 1, 0.5, 1)'
+          }} className="floating-card">
+            <div style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '50%',
+              backgroundColor: '#e8f3ff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--primary)',
+              flexShrink: 0
+            }}>
+              <DollarSign size={16} />
+            </div>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontSize: '13px', fontWeight: '800', color: '#1d2226' }}>₹12,000+/mo</div>
+              <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '1px' }}>Avg. Min. Salary</div>
+            </div>
+          </div>
+
+          {/* FLOATING BADGE 4: Seeker Avatars & Quote (Right Lower) */}
+          <div style={{
+            position: 'absolute',
+            bottom: '10%',
+            right: '1%',
+            backgroundColor: 'white',
+            border: '1px solid var(--border-color)',
+            boxShadow: 'var(--shadow-lg)',
+            borderRadius: '16px',
+            padding: '12px 16px',
+            width: '200px',
+            zIndex: 10,
+            transform: 'translate(calc(var(--mouse-x, 0) * 20px), calc(var(--mouse-y, 0) * 20px))',
+            transition: 'transform 0.2s cubic-bezier(0.25, 1, 0.5, 1)'
+          }} className="floating-card">
+            <div style={{ display: 'flex', marginBottom: '8px' }} className="avatar-group">
+              {acceptedSeekers.length > 0 ? (
+                acceptedSeekers.slice(0, 5).map((seeker, idx) => {
+                  const zIndex = 5 - idx;
+                  const marginLeft = idx === 0 ? '0' : '-8px';
+                  const initials = seeker.fullName ? seeker.fullName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : '?';
+                  
+                  const bgColors = ['#0a66c2', '#0f766e', '#ea580c', '#6366f1', '#ec4899'];
+                  const bgColor = bgColors[idx % bgColors.length];
+
+                  return (
+                    <div 
+                      key={seeker._id || idx}
+                      style={{ 
+                        width: '26px', 
+                        height: '26px', 
+                        borderRadius: '50%', 
+                        border: '2px solid white', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        backgroundColor: bgColor, 
+                        color: 'white', 
+                        fontSize: '9px', 
+                        fontWeight: 'bold', 
+                        marginLeft: marginLeft, 
+                        zIndex: zIndex,
+                        overflow: 'hidden',
+                        boxShadow: 'var(--shadow-sm)'
+                      }}
+                      title={`${seeker.fullName} (${seeker.position})`}
+                    >
+                      {seeker.photoUrl ? (
+                        <img 
+                          src={seeker.photoUrl} 
+                          alt={seeker.fullName} 
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                        />
+                      ) : (
+                        initials
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                <>
+                  <div style={{ width: '26px', height: '26px', borderRadius: '50%', backgroundColor: '#0a66c2', border: '2px solid white', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '9px', fontWeight: 'bold', zIndex: 3 }}>S</div>
+                  <div style={{ width: '26px', height: '26px', borderRadius: '50%', backgroundColor: '#0f766e', border: '2px solid white', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '9px', fontWeight: 'bold', marginLeft: '-8px', zIndex: 2 }}>D</div>
+                  <div style={{ width: '26px', height: '26px', borderRadius: '50%', backgroundColor: '#ea580c', border: '2px solid white', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '9px', fontWeight: 'bold', marginLeft: '-8px', zIndex: 1 }}>M</div>
+                </>
+              )}
+            </div>
+            <div style={{ fontSize: '10px', color: 'var(--text-muted)', lineHeight: '1.4', textAlign: 'left' }}>
+              Empowering <span style={{ color: 'var(--accent)', fontWeight: 'bold' }}>fresher designers</span> with direct industry opportunities.
+            </div>
+          </div>
+
+          {/* Floating Decorative SVG/Icons */}
+          <span style={{
+            position: 'absolute',
+            top: '32%',
+            left: '26%',
+            zIndex: 1,
+            color: 'rgba(10, 102, 194, 0.35)',
+            transform: 'translate(calc(var(--mouse-x, 0) * -35px), calc(var(--mouse-y, 0) * -35px))',
+            transition: 'transform 0.18s cubic-bezier(0.25, 1, 0.5, 1)'
+          }}><Palette size={24} /></span>
+
+          <span style={{
+            position: 'absolute',
+            bottom: '38%',
+            right: '26%',
+            zIndex: 1,
+            color: 'rgba(234, 88, 12, 0.35)',
+            transform: 'translate(calc(var(--mouse-x, 0) * 35px), calc(var(--mouse-y, 0) * 35px))',
+            transition: 'transform 0.18s cubic-bezier(0.25, 1, 0.5, 1)'
+          }}><Laptop size={24} /></span>
         </div>
+
+        {/* Buttons and Quick Stats Row */}
+        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', justifyContent: 'center', margin: '30px 0 40px 0', zIndex: 5 }}>
+          <button 
+            onClick={() => navigate('/auth')} 
+            className="btn btn-primary" 
+            style={{ padding: '12px 26px', fontSize: '15px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            Get started <ChevronRight size={16} />
+          </button>
+          <button 
+            onClick={() => {
+              document.getElementById('jobs-section')?.scrollIntoView({ behavior: 'smooth' });
+            }} 
+            className="btn" 
+            style={{
+              padding: '12px 26px',
+              fontSize: '15px',
+              borderRadius: '8px',
+              backgroundColor: 'white',
+              border: '1px solid var(--border-color)',
+              color: 'var(--text-main)',
+              cursor: 'pointer'
+            }}
+          >
+            Browse jobs
+          </button>
+        </div>
+
+
+        {/* Embedded styling for Hero Stack layout responsiveness */}
+        <style dangerouslySetInnerHTML={{__html: `
+          @media (max-width: 768px) {
+            .hero-stack-section h1 {
+              font-size: 34px !important;
+            }
+            .hero-illustration-parallax {
+              height: 380px !important;
+            }
+            .hero-main-character {
+              max-width: 240px !important;
+            }
+            .floating-card {
+              scale: 0.82;
+            }
+            .floating-card:nth-of-type(1) {
+              top: 5% !important;
+              left: -5% !important;
+            }
+            .floating-card:nth-of-type(2) {
+              bottom: 2% !important;
+              left: -8% !important;
+              width: 140px !important;
+            }
+            .floating-card:nth-of-type(3) {
+              top: 10% !important;
+              right: -5% !important;
+            }
+            .floating-card:nth-of-type(4) {
+              bottom: 2% !important;
+              right: -8% !important;
+              width: 150px !important;
+            }
+            .hero-search-bar {
+              flex-direction: column !important;
+              border-radius: 24px !important;
+              padding: 16px !important;
+              gap: 12px !important;
+            }
+            .hero-search-bar input {
+              width: 100% !important;
+              padding: 6px 0 !important;
+              text-align: center !important;
+            }
+            .hero-search-bar select {
+              width: 100% !important;
+              padding: 6px 0 !important;
+              text-align: center !important;
+            }
+            .hero-search-bar div {
+              display: none !important;
+            }
+            .hero-search-btn {
+              width: 100% !important;
+              border-radius: 20px !important;
+              height: 40px !important;
+            }
+          }
+          .founder-image-wrapper {
+            flex: 0 0 100%;
+            max-width: 100%;
+          }
+          @media (min-width: 768px) {
+            .founder-image-wrapper {
+              flex: 0 0 250px !important;
+              max-width: 250px !important;
+            }
+          }
+        `}} />
       </section>
 
       {/* 2. Designed for Designers Track Section (Screenshot 2 alignment) */}
@@ -576,14 +988,7 @@ const Landing = ({ user, profile, refreshMe }) => {
           gap: '30px'
         }}>
           {/* Suryansh Image Display */}
-          <div style={{
-            flex: '0 0 100%',
-            maxWidth: '100%',
-            '@media (min-width: 768px)': {
-              flex: '0 0 250px',
-              maxWidth: '250px'
-            }
-          }} className="founder-image-wrapper">
+          <div className="founder-image-wrapper">
             <img 
               src={suryanshImg} 
               alt="Suryansh - Founder" 
@@ -614,57 +1019,28 @@ const Landing = ({ user, profile, refreshMe }) => {
         </div>
       </section>
 
-      {/* Search and Filters Block */}
-      <section style={{ marginBottom: '30px' }} id="jobs-section">
-        <div className="card" style={{ padding: '20px' }}>
-
-          <div style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '16px',
-            alignItems: 'center',
-            justifyContent: 'space-between'
-          }}>
-            {/* Search Input */}
-            <div style={{ position: 'relative', flex: '1', minWidth: '280px' }}>
-              <Search size={18} style={{
-                position: 'absolute',
-                left: '12px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: 'var(--text-light)'
-              }} />
-              <input
-                type="text"
-                className="form-control"
-                placeholder="Search jobs by title, area, or tools..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                style={{ paddingLeft: '40px' }}
-              />
-            </div>
-
-            {/* Filter Buttons */}
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {['All', 'Graphic Designer', 'UI/UX Designer', 'Motion Graphic Designer'].map((role) => (
-                <button
-                  key={role}
-                  onClick={() => setRoleFilter(role)}
-                  className={`btn ${roleFilter === role ? 'btn-primary' : 'btn-secondary'}`}
-                  style={{ padding: '8px 18px', fontSize: '14px' }}
-                >
-                  {role}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Main Jobs Listing Section (Indeed Layout + LinkedIn side-by-side) */}
-      <h2 style={{ fontSize: '24px', marginBottom: '20px', color: 'var(--text-main)' }}>
-        Explore Fresh Job Openings ({filteredJobs.length})
-      </h2>
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        marginBottom: '20px', 
+        flexWrap: 'wrap', 
+        gap: '12px' 
+      }} id="jobs-section">
+        <h2 style={{ fontSize: '24px', color: 'var(--text-main)', margin: 0 }}>
+          Explore Fresh Job Openings ({filteredJobs.length})
+        </h2>
+        { (roleFilter !== 'All' || searchQuery) && (
+          <button 
+            onClick={() => { setRoleFilter('All'); setSearchQuery(''); }}
+            className="btn btn-secondary" 
+            style={{ padding: '6px 14px', fontSize: '12px', borderRadius: '20px' }}
+          >
+            Clear Filters & Search
+          </button>
+        ) }
+      </div>
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: '60px 0' }}>
@@ -813,9 +1189,15 @@ const Landing = ({ user, profile, refreshMe }) => {
                   </div>
                   <div>
                     <span style={{ fontSize: '11px', color: 'var(--text-light)', display: 'block', textTransform: 'uppercase', fontWeight: 'bold' }}>Contact Recruiter</span>
-                    <a href={`mailto:${selectedJob.hrEmail}`} style={{ fontSize: '14px', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>
-                      {selectedJob.hrEmail}
-                    </a>
+                    {selectedJob.hrEmail === 'no mail' ? (
+                      <span style={{ fontSize: '14px', fontWeight: 'bold', color: 'var(--text-muted)', display: 'block' }}>
+                        no mail
+                      </span>
+                    ) : (
+                      <a href={`mailto:${selectedJob.hrEmail}`} style={{ fontSize: '14px', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>
+                        {selectedJob.hrEmail}
+                      </a>
+                    )}
                   </div>
                 </div>
 

@@ -295,6 +295,30 @@ const HRDashboard = ({ user }) => {
     }
   };
 
+  const handleResumeJob = async (jobId) => {
+    try {
+      const res = await fetch(`/api/applications/resume-job/${jobId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      const json = await res.json();
+      if (json.success) {
+        alert(json.message || 'Job listing resumed successfully');
+        fetchRecruiterJobs();
+        if (json.data) {
+          setSelectedJob(json.data);
+        }
+      } else {
+        alert(json.message || 'Failed to resume listing');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Connection error.');
+    }
+  };
+
   const filteredApplicants = applicants.filter((app) => {
     const prof = app.profile;
     if (!prof) return false;
@@ -409,7 +433,7 @@ const HRDashboard = ({ user }) => {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                     <span className="badge badge-primary" style={{ fontSize: '10px' }}>{job.role}</span>
-                    <span className={`badge ${job.status === 'open' ? 'badge-success' : 'badge-error'}`} style={{ fontSize: '10px' }}>
+                    <span className={`badge ${job.status === 'open' ? 'badge-success' : job.status === 'paused' ? 'badge-warning' : 'badge-error'}`} style={{ fontSize: '10px' }}>
                       {job.status.toUpperCase()}
                     </span>
                   </div>
@@ -601,12 +625,12 @@ const HRDashboard = ({ user }) => {
                   <div className="form-group" style={{ gridColumn: 'span 2' }}>
                     <label className="form-label">HR Contact Email (For Alerts & Inquiries)</label>
                     <input
-                      type="email"
+                      type="text"
                       required
                       className="form-control"
                       value={hrEmail}
                       onChange={(e) => setHrEmail(e.target.value)}
-                      placeholder="hr@company.com"
+                      placeholder="hr@company.com or 'no mail'"
                     />
                   </div>
 
@@ -718,6 +742,37 @@ const HRDashboard = ({ user }) => {
                 </div>
               </div>
 
+              {selectedJob.status === 'paused' && (
+                <div className="card animate-fade-in" style={{
+                  backgroundColor: 'var(--warning-bg)',
+                  border: '1px solid var(--warning)',
+                  color: 'var(--warning)',
+                  padding: '16px 20px',
+                  marginBottom: '20px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '12px'
+                }}>
+                  <div style={{ flex: '1', minWidth: '250px' }}>
+                    <strong style={{ display: 'block', fontSize: '15px', color: 'var(--warning)', marginBottom: '4px' }}>
+                      ⚠️ Job Paused (Vacancy limit met)
+                    </strong>
+                    <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                      Applications have paused because the vacancy limit was met. Review candidates below. If slots are still available, you can resume the listing.
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => handleResumeJob(selectedJob._id)}
+                    className="btn btn-accent"
+                    style={{ padding: '8px 16px', fontSize: '13px' }}
+                  >
+                    Resume Listing
+                  </button>
+                </div>
+              )}
+
               {/* Applicants list for selected job */}
               <h3 style={{ fontSize: '16px', color: 'var(--text-main)', marginBottom: '16px' }}>
                 Applications Received ({applicants.length} of {selectedJob.vacancies} vacancies)
@@ -798,7 +853,7 @@ const HRDashboard = ({ user }) => {
                             {app.status === 'pending' ? (
                               <div style={{ display: 'flex', gap: '6px' }}>
                                 <button
-                                  onClick={() => handleStatusUpdate(app._id, 'accepted')}
+                                  onClick={() => handleStatusUpdate(app._id, 'cracked')}
                                   title="Accept Candidate"
                                   className="btn btn-primary"
                                   style={{ padding: '8px', borderRadius: '50%' }}
@@ -815,7 +870,7 @@ const HRDashboard = ({ user }) => {
                                 </button>
                               </div>
                             ) : (
-                              <span className={`badge ${app.status === 'accepted' ? 'badge-success' : 'badge-error'}`} style={{ textTransform: 'uppercase', fontSize: '11px', fontWeight: 'bold' }}>
+                              <span className={`badge ${app.status === 'cracked' ? 'badge-success' : 'badge-error'}`} style={{ textTransform: 'uppercase', fontSize: '11px', fontWeight: 'bold' }}>
                                 {app.status}
                               </span>
                             )}
@@ -1030,11 +1085,11 @@ const HRDashboard = ({ user }) => {
                     Reject Candidate
                   </button>
                   <button
-                    onClick={() => handleStatusUpdate(selectedCandidate._id, 'accepted')}
+                    onClick={() => handleStatusUpdate(selectedCandidate._id, 'cracked')}
                     className="btn btn-primary"
                     style={{ padding: '10px 25px' }}
                   >
-                    Accept Candidate (Close Listing)
+                    Accept Candidate (Cracked)
                   </button>
                 </>
               ) : (
@@ -1043,8 +1098,8 @@ const HRDashboard = ({ user }) => {
                   alignItems: 'center',
                   gap: '8px',
                   padding: '8px 16px',
-                  backgroundColor: selectedCandidate.status === 'accepted' ? 'var(--success-bg)' : 'var(--error-bg)',
-                  color: selectedCandidate.status === 'accepted' ? 'var(--success)' : 'var(--error)',
+                  backgroundColor: selectedCandidate.status === 'cracked' ? 'var(--success-bg)' : 'var(--error-bg)',
+                  color: selectedCandidate.status === 'cracked' ? 'var(--success)' : 'var(--error)',
                   borderRadius: 'var(--radius-sm)',
                   fontWeight: 'bold'
                 }}>

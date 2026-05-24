@@ -216,9 +216,105 @@ const sendRejectionEmail = async (seekerEmail, seekerName, jobTitle) => {
   });
 };
 
+// Seeker registration OTP email
+const sendRegistrationOtp = async (email, name, emailOtp, mobileOtp) => {
+  const subject = `Verify Your Account - JJ Just Job OTP`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1d2226; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;">
+      <div style="background: linear-gradient(135deg, #0a66c2 0%, #008080 100%); padding: 24px; text-align: center; color: white;">
+        <h1 style="margin: 0; font-size: 24px; font-weight: bold; letter-spacing: 1px;">JJ Just Job</h1>
+        <p style="margin: 4px 0 0 0; font-size: 14px; opacity: 0.9;">Verify your email & mobile number</p>
+      </div>
+      <div style="padding: 24px; background-color: #ffffff;">
+        <h2 style="margin-top: 0; color: #0a66c2;">Hi ${name},</h2>
+        <p>Thank you for registering on JJ Just Job. To complete your registration, please verify your account using the OTP codes below:</p>
+        
+        <div style="margin: 24px 0; display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+          <div style="padding: 16px; background-color: #f3f2f0; border-radius: 8px; text-align: center; border-top: 4px solid #0a66c2;">
+            <span style="font-size: 12px; color: #8c8c8c; display: block; text-transform: uppercase;">Gmail OTP</span>
+            <strong style="font-size: 28px; color: #0a66c2; letter-spacing: 2px;">${emailOtp}</strong>
+          </div>
+          <div style="padding: 16px; background-color: #f3f2f0; border-radius: 8px; text-align: center; border-top: 4px solid #008080;">
+            <span style="font-size: 12px; color: #8c8c8c; display: block; text-transform: uppercase;">Mobile OTP</span>
+            <strong style="font-size: 28px; color: #008080; letter-spacing: 2px;">${mobileOtp}</strong>
+          </div>
+        </div>
+
+        <p style="font-size: 12px; color: #8c8c8c;">Note: The OTP codes are valid for 10 minutes. Do not share them with anyone.</p>
+        <p>If you did not initiate this registration, you can safely ignore this email.</p>
+        <hr style="border: 0; border-top: 1px solid #e0e0e0; margin: 24px 0;">
+        <p style="font-size: 12px; color: #8c8c8c; text-align: center; margin: 0;">Developed by Suryansh (Founder) | JJ Just Job</p>
+      </div>
+    </div>
+  `;
+
+  await sendEmail({
+    to: email,
+    subject,
+    html,
+    text: `Hi ${name},\n\nThank you for registering on JJ Just Job. Please verify your account using these OTP codes:\nGmail OTP: ${emailOtp}\nMobile OTP: ${mobileOtp}\n\nDeveloped by Suryansh (Founder)`
+  });
+};
+
+// Recruiter alert on new application
+const sendRecruiterApplicationAlert = async (hrEmail, seekerName, jobTitle) => {
+  const subject = `New Application Received for ${jobTitle}`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1d2226; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;">
+      <div style="background: linear-gradient(135deg, #0a66c2 0%, #008080 100%); padding: 24px; text-align: center; color: white;">
+        <h1 style="margin: 0; font-size: 24px; font-weight: bold; letter-spacing: 1px;">NEW APPLICATION</h1>
+        <p style="margin: 4px 0 0 0; font-size: 14px; opacity: 0.9;">JJ Just Job - Recruiter Alerts</p>
+      </div>
+      <div style="padding: 24px; background-color: #ffffff;">
+        <h2 style="margin-top: 0; color: #0a66c2;">Hi Hiring Manager,</h2>
+        <p>A job seeker (<strong>${seekerName}</strong>) has applied for your job opening: <strong>${jobTitle}</strong>.</p>
+        <p>Their full profile details and portfolio work samples are now available on your dashboard for review.</p>
+        <p style="font-weight: bold; color: #0a66c2;">Please log in to your dashboard to review their resume and update their status.</p>
+        <hr style="border: 0; border-top: 1px solid #e0e0e0; margin: 24px 0;">
+        <p style="font-size: 12px; color: #8c8c8c; text-align: center; margin: 0;">Developed by Suryansh (Founder) | JJ Just Job</p>
+      </div>
+    </div>
+  `;
+  await sendEmail({
+    to: hrEmail,
+    subject,
+    html,
+    text: `Dear HR,\n\n${seekerName} has applied for your job opening: ${jobTitle}. Review their details on your dashboard.\n\nDeveloped by Suryansh (Founder)`
+  });
+};
+
+// Recruiter alert on posting a job
+const sendJobPostedConfirmation = async (hrEmail, hrName, jobTitle) => {
+  const subject = `Job Posted Successfully - ${jobTitle}`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1d2226; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;">
+      <div style="background: linear-gradient(135deg, #0a66c2 0%, #008080 100%); padding: 24px; text-align: center; color: white;">
+        <h1 style="margin: 0; font-size: 24px; font-weight: bold; letter-spacing: 1px;">JOB PUBLISHED</h1>
+        <p style="margin: 4px 0 0 0; font-size: 14px; opacity: 0.9;">JJ Just Job - Recruiter Portal</p>
+      </div>
+      <div style="padding: 24px; background-color: #ffffff;">
+        <h2 style="margin-top: 0; color: #0a66c2;">Hi ${hrName},</h2>
+        <p>Your job listing for <strong>${jobTitle}</strong> has been successfully published on the JJ Just Job portal.</p>
+        <p>It is now live and visible to job seekers. We will notify you by email as soon as candidates apply.</p>
+        <hr style="border: 0; border-top: 1px solid #e0e0e0; margin: 24px 0;">
+        <p style="font-size: 12px; color: #8c8c8c; text-align: center; margin: 0;">Developed by Suryansh (Founder) | JJ Just Job</p>
+      </div>
+    </div>
+  `;
+  await sendEmail({
+    to: hrEmail,
+    subject,
+    html,
+    text: `Dear ${hrName},\n\nYour job listing for ${jobTitle} is now successfully published on the JJ Just Job portal.\n\nDeveloped by Suryansh (Founder)`
+  });
+};
+
 module.exports = {
   sendApplicationConfirmation,
   sendVacancyFullAlert,
   sendAcceptanceEmail,
-  sendRejectionEmail
+  sendRejectionEmail,
+  sendRegistrationOtp,
+  sendRecruiterApplicationAlert,
+  sendJobPostedConfirmation
 };

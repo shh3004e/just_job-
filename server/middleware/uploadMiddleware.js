@@ -23,7 +23,7 @@ const storage = multer.diskStorage({
 const fileFilter = (req, file, cb) => {
   const filetypes = {
     resume: /pdf/,
-    photo: /jpeg|jpg|png|webp/,
+    photo: /jpeg|jpg/,
     workSamples: /jpeg|jpg|png|webp/
   };
 
@@ -38,6 +38,8 @@ const fileFilter = (req, file, cb) => {
   } else {
     if (file.fieldname === 'resume') {
       cb(new Error('Resume must be a PDF file only!'));
+    } else if (file.fieldname === 'photo') {
+      cb(new Error('Profile photo must be a JPG/JPEG file only!'));
     } else {
       cb(new Error('Images must be of type jpeg, jpg, png, or webp only!'));
     }

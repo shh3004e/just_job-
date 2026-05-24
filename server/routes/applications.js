@@ -50,8 +50,37 @@ router.post('/profile', protect, authorize('seeker'), uploadProfileFiles, async 
     const files = req.files || {};
     const existingProfile = await JobSeekerProfile.findOne({ user: req.user.id });
 
+    const cleanupUploadedFiles = (uploadedFiles) => {
+      if (!uploadedFiles) return;
+      Object.keys(uploadedFiles).forEach(key => {
+        uploadedFiles[key].forEach(file => {
+          if (fs.existsSync(file.path)) {
+            fs.unlinkSync(file.path);
+          }
+        });
+      });
+    };
+
+    // Enforce size limits: photo <= 2MB, resume <= 1MB
+    if (files.photo && files.photo[0]) {
+      const photoSize = fs.statSync(files.photo[0].path).size;
+      if (photoSize > 2 * 1024 * 1024) {
+        cleanupUploadedFiles(files);
+        return res.status(400).json({ success: false, message: 'Profile photo must be under 2MB in size!' });
+      }
+    }
+
+    if (files.resume && files.resume[0]) {
+      const resumeSize = fs.statSync(files.resume[0].path).size;
+      if (resumeSize > 1 * 1024 * 1024) {
+        cleanupUploadedFiles(files);
+        return res.status(400).json({ success: false, message: 'Resume PDF must be under 1MB in size!' });
+      }
+    }
+
     if (!existingProfile) {
       if (!files.resume || !files.photo || !files.workSamples || files.workSamples.length !== 3) {
+        cleanupUploadedFiles(files);
         return res.status(400).json({
           success: false,
           message: 'Please upload all required files: Resume (PDF), Profile Photo, and exactly 3 Work Samples.'
@@ -83,6 +112,27 @@ router.post('/profile', protect, authorize('seeker'), uploadProfileFiles, async 
       }
     }
 
+    let parsedPortfolioProjects = [];
+    if (req.body.portfolioProjects) {
+      try {
+        parsedPortfolioProjects = typeof req.body.portfolioProjects === 'string' ? JSON.parse(req.body.portfolioProjects) : req.body.portfolioProjects;
+      } catch (err) {
+        console.error('Error parsing portfolioProjects:', err.message);
+      }
+    }
+
+    let parsedLanguages = [];
+    if (req.body.languages) {
+      try {
+        parsedLanguages = typeof req.body.languages === 'string' ? JSON.parse(req.body.languages) : req.body.languages;
+      } catch (err) {
+        parsedLanguages = parseArray(req.body.languages).map(lang => ({ language: lang, fluency: 'Fluent' }));
+      }
+    }
+
+    const about_them = req.body.about_them || req.body.aboutThem || '';
+    const relocate = req.body.relocate === 'true' || req.body.relocate === true;
+
     const profileData = {
       user: req.user.id,
       fullName,
@@ -92,13 +142,16 @@ router.post('/profile', protect, authorize('seeker'), uploadProfileFiles, async 
       skills: parseArray(skills),
       tools: parseArray(tools),
       gmail,
-      languages: parseArray(languages),
+      languages: parsedLanguages,
       resumeUrl,
       photoUrl,
       workSamples,
       portfolioUrl: portfolioUrl || '',
       schooling,
-      workExperience: parsedWorkExperience
+      workExperience: parsedWorkExperience,
+      about_them,
+      portfolioProjects: parsedPortfolioProjects,
+      relocate
     };
 
     // Upsert profile
@@ -159,11 +212,11 @@ router.post('/apply/:jobId', protect, authorize('seeker'), async (req, res) => {
     // Check vacancy count before applying
     const currentApplicationsCount = await Application.countDocuments({
       job: job._id,
-      status: { $in: ['accepted', 'pending'] }
+      status: { $in: ['cracked', 'pending'] }
     });
     if (currentApplicationsCount >= job.vacancies) {
-      // Auto close the listing
-      job.status = 'closed';
+      // Auto pause the listing
+      job.status = 'paused';
       await job.save();
       return res.status(400).json({
         success: false,
@@ -184,8 +237,8 @@ router.post('/apply/:jobId', protect, authorize('seeker'), async (req, res) => {
     // Re-check vacancies count after applying
     const newApplicationsCount = currentApplicationsCount + 1;
     if (newApplicationsCount === job.vacancies) {
-      // Toggle job status to closed
-      job.status = 'closed';
+      // Toggle job status to paused
+      job.status = 'paused';
       await job.save();
 
       // Notify Recruiter/HR repeatedly (triggers in background, see mailer.js)
@@ -244,8 +297,8 @@ router.get('/my-applications', protect, authorize('seeker'), async (req, res) =>
 router.post('/:id/status', protect, authorize('recruiter'), async (req, res) => {
   try {
     const { status } = req.body;
-    if (!['accepted', 'rejected'].includes(status)) {
-      return res.status(400).json({ success: false, message: 'Invalid status update. Must be accepted or rejected.' });
+    if (!['cracked', 'rejected'].includes(status)) {
+      return res.status(400).json({ success: false, message: 'Invalid status update. Must be cracked or rejected.' });
     }
 
     const application = await Application.findById(req.params.id)
@@ -267,12 +320,12 @@ router.post('/:id/status', protect, authorize('recruiter'), async (req, res) => 
     const job = application.job;
     const seekerProfile = application.profile;
 
-    if (status === 'accepted') {
+    if (status === 'cracked') {
       // Send acceptance email
       await sendAcceptanceEmail(seekerProfile.gmail, seekerProfile.fullName, job.title, job.hrEmail);
 
-      const totalAccepted = await Application.countDocuments({ job: job._id, status: 'accepted' });
-      if (totalAccepted >= job.vacancies) {
+      const totalCracked = await Application.countDocuments({ job: job._id, status: 'cracked' });
+      if (totalCracked >= job.vacancies) {
         // Auto close the listing
         job.status = 'closed';
         await job.save();
@@ -298,10 +351,9 @@ router.post('/:id/status', protect, authorize('recruiter'), async (req, res) => 
           }
         }
       } else {
-        // If we still have vacancies, check if we need to reopen the job
-        // (if the total number of applications (accepted + pending) is less than vacancies, we can reopen it)
+        // If we still have vacancies, check if we need to reopen/unpause the job
         const totalPending = await Application.countDocuments({ job: job._id, status: 'pending' });
-        if (totalAccepted + totalPending < job.vacancies && job.status === 'closed') {
+        if (totalCracked + totalPending < job.vacancies && (job.status === 'closed' || job.status === 'paused')) {
           job.status = 'open';
           await job.save();
         }
@@ -311,12 +363,10 @@ router.post('/:id/status', protect, authorize('recruiter'), async (req, res) => 
       // Send polite rejection email
       await sendRejectionEmail(seekerProfile.gmail, seekerProfile.fullName, job.title);
 
-      // Reopen job posting (make active again) if it was auto-closed due to vacancy limit
-      // and we just freed a slot by rejecting a candidate
-      const totalAccepted = await Application.countDocuments({ job: job._id, status: 'accepted' });
+      // Reopen job posting if it was closed or paused and we just rejected a candidate freeing up a slot
+      const totalCracked = await Application.countDocuments({ job: job._id, status: 'cracked' });
       const totalPending = await Application.countDocuments({ job: job._id, status: 'pending' });
-      if (totalAccepted < job.vacancies && (totalAccepted + totalPending) < job.vacancies && job.status === 'closed') {
-        // Automatically set status back to open since we have vacancies available
+      if (totalCracked < job.vacancies && (totalCracked + totalPending) < job.vacancies && (job.status === 'closed' || job.status === 'paused')) {
         job.status = 'open';
         await job.save();
       }
@@ -345,16 +395,87 @@ router.delete('/:id', protect, authorize('recruiter'), async (req, res) => {
 
     await Application.findByIdAndDelete(req.params.id);
 
-    // If deleting this application frees up vacancy slots, reopen the job post if it was closed
+    // If deleting this application frees up vacancy slots, reopen the job post if it was closed or paused
     const job = application.job;
-    const totalAccepted = await Application.countDocuments({ job: job._id, status: 'accepted' });
+    const totalCracked = await Application.countDocuments({ job: job._id, status: 'cracked' });
     const totalPending = await Application.countDocuments({ job: job._id, status: 'pending' });
-    if (totalAccepted < job.vacancies && (totalAccepted + totalPending) < job.vacancies && job.status === 'closed') {
+    if (totalCracked < job.vacancies && (totalCracked + totalPending) < job.vacancies && (job.status === 'closed' || job.status === 'paused')) {
       job.status = 'open';
       await job.save();
     }
 
     res.status(200).json({ success: true, message: 'Candidate application removed successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+
+// @desc    Get recently accepted seeker profiles for the home page banner
+// @route   GET /api/applications/accepted-seekers
+// @access  Public
+router.get('/accepted-seekers', async (req, res) => {
+  try {
+    const applications = await Application.find({ status: 'cracked' })
+      .populate('profile')
+      .sort({ appliedAt: -1 })
+      .limit(20);
+
+    const profiles = [];
+    const seenProfileIds = new Set();
+
+    for (const app of applications) {
+      if (app.profile && !seenProfileIds.has(app.profile._id.toString())) {
+        seenProfileIds.add(app.profile._id.toString());
+        profiles.push({
+          _id: app.profile._id,
+          fullName: app.profile.fullName,
+          photoUrl: app.profile.photoUrl,
+          position: app.profile.position
+        });
+      }
+      if (profiles.length >= 5) break;
+    }
+
+    res.status(200).json({ success: true, data: profiles });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @desc    Resume paused job posting, adjusting vacancies count
+// @route   POST /api/applications/resume-job/:jobId
+// @access  Private (Recruiter only)
+router.post('/resume-job/:jobId', protect, authorize('recruiter'), async (req, res) => {
+  try {
+    const job = await JobPost.findById(req.params.jobId);
+    if (!job) {
+      return res.status(404).json({ success: false, message: 'Job posting not found' });
+    }
+
+    if (job.user.toString() !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'Not authorized to modify this job' });
+    }
+
+    // Get count of cracked candidates
+    const crackedCount = await Application.countDocuments({
+      job: job._id,
+      status: 'cracked'
+    });
+
+    if (crackedCount >= job.vacancies) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot resume listing. All vacancy slots have been filled by accepted (cracked) candidates.'
+      });
+    }
+
+    // Adjust vacancies count by deducting the cracked count
+    job.vacancies = job.vacancies - crackedCount;
+    job.status = 'open';
+    await job.save();
+
+    res.status(200).json({ success: true, message: 'Job listing resumed successfully', data: job });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

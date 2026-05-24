@@ -1,115 +1,140 @@
-const mongoose = require('mongoose');
-
-const JobSeekerProfileSchema = new mongoose.Schema({
-  user: {
-    type: mongoose.Schema.ObjectId,
-    ref: 'User',
-    required: true,
-    unique: true
-  },
-  fullName: {
-    type: String,
-    required: [true, 'Please add your full name'],
-    trim: true
-  },
-  position: {
-    type: String,
-    enum: ['Graphic Designer', 'UI/UX Designer', 'Motion Graphic Designer'],
-    required: [true, 'Please select your position']
-  },
-  experienceType: {
-    type: String,
-    enum: ['months', 'years'],
-    required: true
-  },
-  experienceValue: {
-    type: Number,
-    required: [true, 'Please enter your experience'],
-    validate: {
-      validator: function(val) {
-        if (this.experienceType === 'months') {
-          return val >= 0 && val <= 11;
-        } else {
-          return val >= 0 && val <= 1;
-        }
-      },
-      message: 'Experience must be fresher-level (0-11 months OR 0-1 years only).'
-    }
-  },
-  skills: {
-    type: [String],
-    required: [true, 'Please add at least one skill']
-  },
-  tools: {
-    type: [String],
-    required: [true, 'Please select at least one software/tool']
-  },
-  gmail: {
-    type: String,
-    required: [true, 'Please add your contact Gmail address'],
-    match: [
-      /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
-      'Please add a valid email'
-    ],
-    lowercase: true,
-    trim: true
-  },
-  languages: {
-    type: [String],
-    required: [true, 'Please add languages known']
-  },
-  resumeUrl: {
-    type: String,
-    required: [true, 'Please upload your resume (PDF only)']
-  },
-  photoUrl: {
-    type: String,
-    required: [true, 'Please upload your profile photo']
-  },
-  workSamples: {
-    type: [String],
-    validate: {
-      validator: function(val) {
-        return val.length === 3;
-      },
-      message: 'You must upload exactly 3 work samples.'
-    },
-    required: [true, 'Please upload exactly 3 work samples']
-  },
-  portfolioUrl: {
-    type: String,
-    trim: true
-  },
-  schooling: {
-    type: String,
-    required: [true, 'Please add your schooling/education details'],
-    trim: true
-  },
-  workExperience: [
-    {
-      company: { type: String, required: true },
-      role: { type: String, required: true },
-      fromMonth: { type: String, required: true },
-      fromYear: { type: String, required: true },
-      toMonth: { type: String, required: true },
-      toYear: { type: String, required: true },
-      description: { type: String }
-    }
-  ],
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
-});
-
-const MongooseJobSeekerProfile = mongoose.model('JobSeekerProfile', JobSeekerProfileSchema);
 const mockDb = require('../utils/mockDb');
 
-module.exports = new Proxy(MongooseJobSeekerProfile, {
-  get(target, prop) {
-    if (global.useMockDb && mockDb.JobSeekerProfile[prop] !== undefined) {
-      return mockDb.JobSeekerProfile[prop];
+const mapProfileToMongoose = (profile) => {
+  if (!profile) return null;
+  
+  // Safe JSON parse for array fields
+  const parseJsonField = (field) => {
+    if (!field) return [];
+    if (typeof field === 'string') {
+      try {
+        return JSON.parse(field);
+      } catch (e) {
+        return [];
+      }
     }
-    return target[prop];
+    return field;
+  };
+
+  return {
+    _id: profile.seeker_id,
+    id: profile.seeker_id,
+    user: profile.seeker_id,
+    fullName: profile.full_name,
+    position: profile.position,
+    experienceType: profile.experience_type,
+    experienceValue: profile.experience_value,
+    skills: profile.skills || [],
+    tools: profile.tools || [],
+    gmail: profile.gmail,
+    about_them: profile.about_them,
+    schooling: profile.schooling,
+    resumeUrl: profile.resume_url,
+    photoUrl: profile.photo_url,
+    workSamples: profile.work_samples || [],
+    portfolioProjects: parseJsonField(profile.portfolio_projects),
+    portfolioUrl: profile.website_link || '',
+    languages: parseJsonField(profile.languages),
+    relocate: profile.relocate || false,
+    createdAt: profile.created_at
+  };
+};
+
+const findOne = async (conditions) => {
+  if (global.useMockDb) {
+    return mockDb.JobSeekerProfile.findOne(conditions);
   }
-});
+  const { pool } = require('../config/db');
+  
+  let seekerId = conditions.user;
+  if (conditions.seeker_id) seekerId = conditions.seeker_id;
+  if (conditions._id) seekerId = conditions._id;
+  
+  if (!seekerId) return null;
+
+  const res = await pool.query('SELECT * FROM job_seeker_profiles WHERE seeker_id = $1', [seekerId]);
+  if (res.rows.length === 0) return null;
+  
+  return mapProfileToMongoose(res.rows[0]);
+};
+
+const findOneAndUpdate = async (query, updateData, options = {}) => {
+  if (global.useMockDb) {
+    return mockDb.JobSeekerProfile.findOneAndUpdate(query, updateData, options);
+  }
+  const { pool } = require('../config/db');
+  const userId = query.user;
+  
+  if (!userId) throw new Error('Query user ID is required');
+
+  // Check if profile exists
+  const checkRes = await pool.query('SELECT * FROM job_seeker_profiles WHERE seeker_id = $1', [userId]);
+  const exists = checkRes.rows.length > 0;
+  
+  let res;
+  if (exists) {
+    res = await pool.query(
+      `UPDATE job_seeker_profiles 
+       SET full_name = $1, position = $2, experience_type = $3, experience_value = $4, 
+           skills = $5, tools = $6, gmail = $7, about_them = $8, schooling = $9, 
+           resume_url = $10, photo_url = $11, work_samples = $12, portfolio_projects = $13, 
+           website_link = $14, languages = $15, relocate = $16
+       WHERE seeker_id = $17 RETURNING *`,
+      [
+        updateData.fullName,
+        updateData.position,
+        updateData.experienceType,
+        Number(updateData.experienceValue),
+        updateData.skills || [],
+        updateData.tools || [],
+        updateData.gmail,
+        updateData.about_them || '',
+        updateData.schooling,
+        updateData.resumeUrl,
+        updateData.photoUrl,
+        updateData.workSamples || [],
+        JSON.stringify(updateData.portfolioProjects || []),
+        updateData.portfolioUrl || '',
+        JSON.stringify(updateData.languages || []),
+        updateData.relocate || false,
+        userId
+      ]
+    );
+  } else {
+    res = await pool.query(
+      `INSERT INTO job_seeker_profiles 
+       (seeker_id, full_name, position, experience_type, experience_value, 
+        skills, tools, gmail, about_them, schooling, 
+        resume_url, photo_url, work_samples, portfolio_projects, 
+        website_link, languages, relocate)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING *`,
+      [
+        userId,
+        updateData.fullName,
+        updateData.position,
+        updateData.experienceType,
+        Number(updateData.experienceValue),
+        updateData.skills || [],
+        updateData.tools || [],
+        updateData.gmail,
+        updateData.about_them || '',
+        updateData.schooling,
+        updateData.resumeUrl,
+        updateData.photoUrl,
+        updateData.workSamples || [],
+        JSON.stringify(updateData.portfolioProjects || []),
+        updateData.portfolioUrl || '',
+        JSON.stringify(updateData.languages || []),
+        updateData.relocate || false
+      ]
+    );
+  }
+  
+  return mapProfileToMongoose(res.rows[0]);
+};
+
+module.exports = {
+  findOne,
+  findOneAndUpdate,
+  mapProfileToMongoose
+};
