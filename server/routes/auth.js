@@ -48,8 +48,10 @@ router.post('/register', async (req, res) => {
       mobile_verified: false
     });
 
-    // Send OTP verification email
-    await sendRegistrationOtp(email, name, emailOtp, mobileOtp);
+    // Send OTP verification email in background
+    sendRegistrationOtp(email, name, emailOtp, mobileOtp).catch(err => {
+      console.error('Background email sending failed:', err.message);
+    });
 
     res.status(201).json({
       success: true,

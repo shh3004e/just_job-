@@ -231,8 +231,10 @@ router.post('/apply/:jobId', protect, authorize('seeker'), async (req, res) => {
       seeker: req.user.id
     });
 
-    // Send application confirmation to job seeker
-    await sendApplicationConfirmation(profile.gmail, profile.fullName, job.title);
+    // Send application confirmation to job seeker in background
+    sendApplicationConfirmation(profile.gmail, profile.fullName, job.title).catch(err => {
+      console.error('Error sending application confirmation:', err.message);
+    });
 
     // Re-check vacancies count after applying
     const newApplicationsCount = currentApplicationsCount + 1;
@@ -241,8 +243,10 @@ router.post('/apply/:jobId', protect, authorize('seeker'), async (req, res) => {
       job.status = 'paused';
       await job.save();
 
-      // Notify Recruiter/HR repeatedly (triggers in background, see mailer.js)
-      await sendVacancyFullAlert(job.hrEmail, job.title, job.vacancies);
+      // Notify Recruiter/HR repeatedly in background
+      sendVacancyFullAlert(job.hrEmail, job.title, job.vacancies).catch(err => {
+        console.error('Error sending vacancy full alert:', err.message);
+      });
     }
 
     res.status(201).json({ success: true, data: application });
@@ -321,8 +325,10 @@ router.post('/:id/status', protect, authorize('recruiter'), async (req, res) => 
     const seekerProfile = application.profile;
 
     if (status === 'cracked') {
-      // Send acceptance email
-      await sendAcceptanceEmail(seekerProfile.gmail, seekerProfile.fullName, job.title, job.hrEmail);
+      // Send acceptance email in background
+      sendAcceptanceEmail(seekerProfile.gmail, seekerProfile.fullName, job.title, job.hrEmail).catch(err => {
+        console.error('Error sending acceptance email:', err.message);
+      });
 
       const totalCracked = await Application.countDocuments({ job: job._id, status: 'cracked' });
       if (totalCracked >= job.vacancies) {
@@ -343,10 +349,12 @@ router.post('/:id/status', protect, authorize('recruiter'), async (req, res) => 
             { status: 'rejected' }
           );
 
-          // Send rejection emails to other seekers that were pending
+          // Send rejection emails in background to other seekers that were pending
           for (const app of otherPendingApps) {
             if (app.profile && app.profile.gmail) {
-              await sendRejectionEmail(app.profile.gmail, app.profile.fullName, job.title);
+              sendRejectionEmail(app.profile.gmail, app.profile.fullName, job.title).catch(err => {
+                console.error('Error sending rejection email:', err.message);
+              });
             }
           }
         }
@@ -360,8 +368,10 @@ router.post('/:id/status', protect, authorize('recruiter'), async (req, res) => 
       }
 
     } else if (status === 'rejected') {
-      // Send polite rejection email
-      await sendRejectionEmail(seekerProfile.gmail, seekerProfile.fullName, job.title);
+      // Send polite rejection email in background
+      sendRejectionEmail(seekerProfile.gmail, seekerProfile.fullName, job.title).catch(err => {
+        console.error('Error sending rejection email:', err.message);
+      });
 
       // Reopen job posting if it was closed or paused and we just rejected a candidate freeing up a slot
       const totalCracked = await Application.countDocuments({ job: job._id, status: 'cracked' });
