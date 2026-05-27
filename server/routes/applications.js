@@ -43,7 +43,11 @@ router.post('/profile', protect, authorize('seeker'), uploadProfileFiles, async 
       languages,
       portfolioUrl,
       schooling,
-      workExperience
+      workExperience,
+      mobileNumber,
+      joiningDate,
+      experienceYears,
+      experienceMonths
     } = req.body;
 
     // Check if files exist (if this is a new profile, they are required)
@@ -121,6 +125,18 @@ router.post('/profile', protect, authorize('seeker'), uploadProfileFiles, async 
       }
     }
 
+    // Map uploaded project files
+    for (let i = 0; i < 3; i++) {
+      if (parsedPortfolioProjects[i]) {
+        const fileKey = `projectFile${i}`;
+        if (files[fileKey] && files[fileKey][0]) {
+          parsedPortfolioProjects[i].fileUrl = `/uploads/${files[fileKey][0].filename}`;
+        } else if (existingProfile && existingProfile.portfolioProjects && existingProfile.portfolioProjects[i]) {
+          parsedPortfolioProjects[i].fileUrl = existingProfile.portfolioProjects[i].fileUrl || '';
+        }
+      }
+    }
+
     let parsedLanguages = [];
     if (req.body.languages) {
       try {
@@ -137,8 +153,8 @@ router.post('/profile', protect, authorize('seeker'), uploadProfileFiles, async 
       user: req.user.id,
       fullName,
       position,
-      experienceType,
-      experienceValue: Number(experienceValue),
+      experienceType: experienceType || 'months',
+      experienceValue: Number(experienceValue || 0),
       skills: parseArray(skills),
       tools: parseArray(tools),
       gmail,
@@ -151,7 +167,11 @@ router.post('/profile', protect, authorize('seeker'), uploadProfileFiles, async 
       workExperience: parsedWorkExperience,
       about_them,
       portfolioProjects: parsedPortfolioProjects,
-      relocate
+      relocate,
+      mobileNumber: mobileNumber || '',
+      joiningDate: joiningDate || '',
+      experienceYears: Number(experienceYears || 0),
+      experienceMonths: Number(experienceMonths || 0)
     };
 
     // Upsert profile

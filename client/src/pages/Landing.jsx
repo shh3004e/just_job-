@@ -34,13 +34,18 @@ const Landing = ({ user, profile, refreshMe }) => {
   };
 
   useEffect(() => {
-    if (user && user.role === 'seeker' && !profile) {
-      navigate('/seeker-dashboard');
-      return;
+    if (user) {
+      if (user.role === 'seeker') {
+        navigate('/seeker-dashboard');
+        return;
+      } else if (user.role === 'recruiter') {
+        navigate('/hr-dashboard');
+        return;
+      }
     }
     fetchJobs();
     fetchAcceptedSeekers();
-  }, [user, profile, navigate]);
+  }, [user, navigate]);
 
   const fetchAcceptedSeekers = async () => {
     try {

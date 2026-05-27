@@ -24,16 +24,24 @@ const fileFilter = (req, file, cb) => {
   const filetypes = {
     resume: /pdf/,
     photo: /jpeg|jpg/,
-    workSamples: /jpeg|jpg|png|webp/
+    workSamples: /jpeg|jpg|png|webp/,
+    projectFile0: /jpeg|jpg|png|webp|pdf|zip|doc|docx|rar|txt/,
+    projectFile1: /jpeg|jpg|png|webp|pdf|zip|doc|docx|rar|txt/,
+    projectFile2: /jpeg|jpg|png|webp|pdf|zip|doc|docx|rar|txt/
   };
 
-  const extname = filetypes[file.fieldname].test(
+  const regex = filetypes[file.fieldname];
+  if (!regex) {
+    return cb(null, true); // accept other fields if they aren't restricted
+  }
+
+  const extname = regex.test(
     path.extname(file.originalname).toLowerCase()
   );
   
-  const mimetype = filetypes[file.fieldname].test(file.mimetype);
+  const mimetype = regex.test(file.mimetype);
 
-  if (extname && mimetype) {
+  if (extname || mimetype) {
     return cb(null, true);
   } else {
     if (file.fieldname === 'resume') {
@@ -41,7 +49,7 @@ const fileFilter = (req, file, cb) => {
     } else if (file.fieldname === 'photo') {
       cb(new Error('Profile photo must be a JPG/JPEG file only!'));
     } else {
-      cb(new Error('Images must be of type jpeg, jpg, png, or webp only!'));
+      cb(new Error('Invalid file type for ' + file.fieldname));
     }
   }
 };
@@ -50,7 +58,7 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB limit per file
+    fileSize: 10 * 1024 * 1024 // 10MB limit per file
   },
   fileFilter: fileFilter
 });
@@ -59,7 +67,10 @@ const upload = multer({
 const uploadProfileFiles = upload.fields([
   { name: 'resume', maxCount: 1 },
   { name: 'photo', maxCount: 1 },
-  { name: 'workSamples', maxCount: 3 }
+  { name: 'workSamples', maxCount: 3 },
+  { name: 'projectFile0', maxCount: 1 },
+  { name: 'projectFile1', maxCount: 1 },
+  { name: 'projectFile2', maxCount: 1 }
 ]);
 
 module.exports = { uploadProfileFiles };

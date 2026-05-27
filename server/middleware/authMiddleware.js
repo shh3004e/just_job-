@@ -19,10 +19,19 @@ const protect = async (req, res, next) => {
   }
 
   try {
-    // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'supersecretjjjustjobtoken12345!');
-
-    req.user = await User.findById(decoded.id);
+    if (global.useMockDb) {
+      // Verify local JWT
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'supersecretjjjustjobtoken12345!');
+      req.user = await User.findById(decoded.id);
+    } else {
+      // Verify Supabase JWT
+      const supabase = require('../config/supabase');
+      const { data: { user: sUser }, error: sError } = await supabase.auth.getUser(token);
+      if (sError || !sUser) {
+        return res.status(401).json({ success: false, message: 'Not authorized to access this route' });
+      }
+      req.user = await User.findOne({ email: sUser.email });
+    }
 
     if (!req.user) {
       return res.status(401).json({ success: false, message: 'User not found' });

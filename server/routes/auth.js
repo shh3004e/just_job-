@@ -320,4 +320,83 @@ router.get('/me', protect, async (req, res) => {
   }
 });
 
+// @desc    Get auth system status
+// @route   GET /api/auth/status
+// @access  Public
+router.get('/status', (req, res) => {
+  res.status(200).json({
+    success: true,
+    useMockDb: global.useMockDb
+  });
+});
+
+// @desc    Sync Supabase Auth user to database tables and logs
+// @route   POST /api/auth/sync
+// @access  Public (internally verifies token)
+router.post('/sync', async (req, res) => {
+  try {
+    const { token, name, email, role, mobile } = req.body;
+
+    if (!token || !email || !role || !name) {
+      return res.status(400).json({ success: false, message: 'Missing parameters for user synchronization' });
+    }
+
+    if (global.useMockDb) {
+      return res.status(400).json({ success: false, message: 'Server is running in mock database mode. Client auth should use direct APIs.' });
+    }
+
+    // Verify token with Supabase Client SDK
+    const supabase = require('../config/supabase');
+    const { data: { user: sUser }, error: sError } = await supabase.auth.getUser(token);
+
+    if (sError || !sUser) {
+      return res.status(401).json({ success: false, message: 'Invalid or expired session token: ' + (sError?.message || 'No user session') });
+    }
+
+    if (sUser.email.toLowerCase() !== email.toLowerCase()) {
+      return res.status(400).json({ success: false, message: 'Email address mismatch during token validation' });
+    }
+
+    // Check if user already exists in our database
+    const User = require('../models/User');
+    let dbUser = await User.findOne({ email });
+
+    if (!dbUser) {
+      // If user doesn't exist, create registration row
+      dbUser = await User.create({
+        name,
+        email,
+        password: require('crypto').randomBytes(16).toString('hex'), // random password
+        role,
+        mobile: mobile || '',
+        email_verified: true,
+        mobile_verified: true,
+        email_otp: '',
+        mobile_otp: ''
+      });
+
+      // Write verified user to Excel sheet registry
+      await appendToExcel(name, email, role);
+    }
+
+    // Log successful login to login_activities table and CSV
+    logLogin(dbUser.name, dbUser.email, dbUser.role, dbUser._id).catch(err => {
+      console.error('Error logging sync login event:', err.message);
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'User synced successfully',
+      user: {
+        id: dbUser._id,
+        name: dbUser.name,
+        email: dbUser.email,
+        role: dbUser.role
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 module.exports = router;

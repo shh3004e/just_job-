@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { LogIn, UserPlus, Briefcase, User as UserIcon, Mail, Lock, ShieldAlert } from 'lucide-react';
 import { Application } from '@splinetool/runtime';
+import { supabase } from '../supabaseClient';
 
 const mockAccounts = [
   {
@@ -38,8 +39,8 @@ const YetiCharacter = ({ isPasswordFocused }) => {
   useEffect(() => {
     let active = true;
     
-    // Find canvas element by ID or fall back to ref
-    const canvas = document.getElementById('canvas3d') || canvasRef.current;
+    // Use the scoped canvas ref directly
+    const canvas = canvasRef.current;
     if (!canvas) return;
 
     // Initialize the Spline Application
@@ -115,7 +116,6 @@ const YetiCharacter = ({ isPasswordFocused }) => {
       )}
       <canvas 
         ref={canvasRef} 
-        id="canvas3d"
         style={{ 
           width: '100%', 
           height: '100%', 
@@ -129,6 +129,23 @@ const YetiCharacter = ({ isPasswordFocused }) => {
 
 const Auth = ({ login, user }) => {
   const [searchParams] = useSearchParams();
+  const [useMockDb, setUseMockDb] = useState(true);
+
+  useEffect(() => {
+    const checkAuthStatus = async () => {
+      try {
+        const res = await fetch('/api/auth/status');
+        const json = await res.json();
+        if (json.success) {
+          setUseMockDb(json.useMockDb);
+        }
+      } catch (err) {
+        console.warn('Failed to query auth status, defaulting to mock mode');
+        setUseMockDb(true);
+      }
+    };
+    checkAuthStatus();
+  }, []);
   
   const [isPasswordFocused, setIsPasswordFocused] = useState(false);
   const authCardRef = useRef(null);
@@ -267,27 +284,65 @@ const Auth = ({ login, user }) => {
     setVerifying(true);
 
     try {
-      const res = await fetch('/api/auth/verify-otp', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+      if (!useMockDb) {
+        // Online Mode: Verify via Supabase Client SDK
+        const { data, error: verifyError } = await supabase.auth.verifyOtp({
           email: verificationData.email,
-          role: verificationData.role,
-          emailOtp,
-          mobileOtp
-        })
-      });
+          token: emailOtp.trim(),
+          type: 'signup'
+        });
 
-      const json = await res.json();
-      if (json.success) {
-        login(json.token, json.user);
+        if (verifyError) throw verifyError;
+
+        if (data.session) {
+          // Sync authenticated user to backend PostgreSQL tables
+          const res = await fetch('/api/auth/sync', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              token: data.session.access_token,
+              name: formData.name || data.user.user_metadata?.name || 'User',
+              email: verificationData.email,
+              role: verificationData.role,
+              mobile: formData.mobile || data.user.user_metadata?.mobile || ''
+            })
+          });
+
+          const syncJson = await res.json();
+          if (syncJson.success) {
+            login(data.session.access_token, syncJson.user);
+          } else {
+            throw new Error(syncJson.message || 'Failed to sync profile to database');
+          }
+        } else {
+          throw new Error('OTP verification succeeded but session could not be established.');
+        }
       } else {
-        setError(json.message || 'Verification failed');
+        // Offline Mode: Custom Backend verification
+        const res = await fetch('/api/auth/verify-otp', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            email: verificationData.email,
+            role: verificationData.role,
+            emailOtp,
+            mobileOtp
+          })
+        });
+
+        const json = await res.json();
+        if (json.success) {
+          login(json.token, json.user);
+        } else {
+          setError(json.message || 'Verification failed');
+        }
       }
     } catch (err) {
-      setError('Could not connect to the verification server.');
+      setError(err.message || 'Could not complete verification.');
     } finally {
       setVerifying(false);
     }
@@ -298,48 +353,147 @@ const Auth = ({ login, user }) => {
     setError('');
     setLoading(true);
 
-    const url = isLoginTab ? '/api/auth/login' : '/api/auth/register';
-    const payload = isLoginTab 
-      ? { email: formData.email, password: formData.password }
-      : formData;
-
     try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-
-      const json = await res.json();
-
-      if (res.status === 403 && json.isNotVerified) {
-        setVerificationData({
-          email: json.email,
-          role: json.role,
-          devHelper: json.devHelper
-        });
-        setError('');
-        return;
-      }
-
-      if (json.success) {
+      if (!useMockDb) {
+        // Online Mode: Supabase Auth Client SDK
         if (isLoginTab) {
-          login(json.token, json.user);
-        } else {
-          // Registration succeeded, show OTP verification view
-          setVerificationData({
+          const { data, error: signInError } = await supabase.auth.signInWithPassword({
             email: formData.email,
-            role: formData.role,
-            devHelper: json.devHelper
+            password: formData.password
           });
+
+          if (signInError) {
+            // If email is unconfirmed, resend verification code and show OTP screen
+            if (signInError.message.toLowerCase().includes('confirm') || signInError.message.toLowerCase().includes('verified')) {
+              await supabase.auth.resend({
+                type: 'signup',
+                email: formData.email
+              });
+              setVerificationData({
+                email: formData.email,
+                role: formData.role,
+                isSupabase: true
+              });
+              setError('Please verify the confirmation code sent to your email.');
+              return;
+            }
+            throw signInError;
+          }
+
+          if (data.session) {
+            // Sync with backend PostgreSQL database to ensure profile and logs are updated
+            const res = await fetch('/api/auth/sync', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                token: data.session.access_token,
+                name: data.user.user_metadata?.name || 'User',
+                email: formData.email,
+                role: formData.role,
+                mobile: data.user.user_metadata?.mobile || ''
+              })
+            });
+
+            const syncJson = await res.json();
+            if (syncJson.success) {
+              login(data.session.access_token, syncJson.user);
+            } else {
+              throw new Error(syncJson.message || 'Failed to sync session with server');
+            }
+          }
+        } else {
+          // Signup: Call supabase.auth.signUp
+          const { data, error: signUpError } = await supabase.auth.signUp({
+            email: formData.email,
+            password: formData.password,
+            options: {
+              data: {
+                name: formData.name,
+                mobile: formData.mobile,
+                role: formData.role
+              }
+            }
+          });
+
+          if (signUpError) throw signUpError;
+
+          if (data.session) {
+            // Session established directly (email confirmation disabled in Supabase dashboard)
+            const res = await fetch('/api/auth/sync', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                token: data.session.access_token,
+                name: formData.name,
+                email: formData.email,
+                role: formData.role,
+                mobile: formData.mobile
+              })
+            });
+
+            const syncJson = await res.json();
+            if (syncJson.success) {
+              login(data.session.access_token, syncJson.user);
+            } else {
+              throw new Error(syncJson.message || 'Failed to initialize profile');
+            }
+          } else {
+            // Transition to verification stage (code sent to Gmail)
+            setVerificationData({
+              email: formData.email,
+              role: formData.role,
+              isSupabase: true
+            });
+          }
         }
       } else {
-        setError(json.message || 'Authentication failed');
+        // Offline Mode: Custom Backend
+        const url = isLoginTab ? '/api/auth/login' : '/api/auth/register';
+        const payload = isLoginTab 
+          ? { email: formData.email, password: formData.password }
+          : formData;
+
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const json = await res.json();
+
+        if (res.status === 403 && json.isNotVerified) {
+          setVerificationData({
+            email: json.email,
+            role: json.role,
+            devHelper: json.devHelper
+          });
+          setError('');
+          return;
+        }
+
+        if (json.success) {
+          if (isLoginTab) {
+            login(json.token, json.user);
+          } else {
+            // Registration succeeded, show OTP verification view
+            setVerificationData({
+              email: formData.email,
+              role: formData.role,
+              devHelper: json.devHelper
+            });
+          }
+        } else {
+          setError(json.message || 'Authentication failed');
+        }
       }
     } catch (err) {
-      setError('Could not connect to the auth server.');
+      setError(err.message || 'Authentication request failed.');
     } finally {
       setLoading(false);
     }
@@ -628,13 +782,13 @@ const Auth = ({ login, user }) => {
                 </div>
               )}
 
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Email OTP</label>
+              <div className="form-group" style={{ marginBottom: verificationData.isSupabase ? 10 : 0 }}>
+                <label className="form-label">{verificationData.isSupabase ? 'Verification Code (OTP)' : 'Email OTP'}</label>
                 <input
                   type="text"
                   required
                   maxLength={6}
-                  placeholder="Enter 6-digit Email OTP"
+                  placeholder={verificationData.isSupabase ? 'Enter 6-digit verification code' : 'Enter 6-digit Email OTP'}
                   className="form-control"
                   value={emailOtp}
                   onChange={(e) => setEmailOtp(e.target.value)}
@@ -642,19 +796,21 @@ const Auth = ({ login, user }) => {
                 />
               </div>
 
-              <div className="form-group" style={{ marginBottom: 10 }}>
-                <label className="form-label">Mobile OTP</label>
-                <input
-                  type="text"
-                  required
-                  maxLength={6}
-                  placeholder="Enter 6-digit Mobile OTP"
-                  className="form-control"
-                  value={mobileOtp}
-                  onChange={(e) => setMobileOtp(e.target.value)}
-                  style={{ borderRadius: '8px', letterSpacing: '2px', textAlign: 'center', fontWeight: 'bold' }}
-                />
-              </div>
+              {!verificationData.isSupabase && (
+                <div className="form-group" style={{ marginBottom: 10 }}>
+                  <label className="form-label">Mobile OTP</label>
+                  <input
+                    type="text"
+                    required
+                    maxLength={6}
+                    placeholder="Enter 6-digit Mobile OTP"
+                    className="form-control"
+                    value={mobileOtp}
+                    onChange={(e) => setMobileOtp(e.target.value)}
+                    style={{ borderRadius: '8px', letterSpacing: '2px', textAlign: 'center', fontWeight: 'bold' }}
+                  />
+                </div>
+              )}
 
               <button
                 type="submit"

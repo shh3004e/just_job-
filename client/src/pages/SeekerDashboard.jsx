@@ -1,8 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, FileText, CheckCircle, Image, Globe, Plus, Trash2, Send, Clock, BookOpen, UserCheck, AlertTriangle } from 'lucide-react';
+import { 
+  User, 
+  FileText, 
+  CheckCircle, 
+  Image, 
+  Globe, 
+  Plus, 
+  Trash2, 
+  Clock, 
+  BookOpen, 
+  AlertTriangle, 
+  Upload, 
+  Eye, 
+  ChevronRight, 
+  LogOut,
+  Mail,
+  Calendar,
+  Phone,
+  Briefcase
+} from 'lucide-react';
+import { motion } from 'motion/react';
+import { clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
 
-const SeekerDashboard = ({ user, profile, refreshMe }) => {
+const SeekerDashboard = ({ user, profile, refreshMe, logout }) => {
   const navigate = useNavigate();
   
   // States for applied jobs tracking
@@ -13,8 +35,6 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
   const [editing, setEditing] = useState(false);
   const [fullName, setFullName] = useState('');
   const [position, setPosition] = useState('Graphic Designer');
-  const [experienceType, setExperienceType] = useState('months');
-  const [experienceValue, setExperienceValue] = useState(0);
   const [skillsStr, setSkillsStr] = useState('');
   const [selectedTools, setSelectedTools] = useState([]);
   const [gmail, setGmail] = useState('');
@@ -24,13 +44,21 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
   const [aboutThem, setAboutThem] = useState('');
   const [relocate, setRelocate] = useState(false);
   const [languagesList, setLanguagesList] = useState([{ language: 'English', fluency: 'Fluent' }]);
-  const [projects, setProjects] = useState([
-    { title: '', description: '', link: '' },
-    { title: '', description: '', link: '' },
-    { title: '', description: '', link: '' },
-    { title: '', description: '', link: '' }
-  ]);
   
+  // Added fields
+  const [mobileNumber, setMobileNumber] = useState('');
+  const [joiningDate, setJoiningDate] = useState('');
+  const [experienceYears, setExperienceYears] = useState(0);
+  const [experienceMonths, setExperienceMonths] = useState(0);
+
+  // Up to 3 best projects
+  const [projects, setProjects] = useState([
+    { title: '', description: '', link: '', fileUrl: '' },
+    { title: '', description: '', link: '', fileUrl: '' },
+    { title: '', description: '', link: '', fileUrl: '' }
+  ]);
+  const [projectFiles, setProjectFiles] = useState([null, null, null]);
+
   // Track Applications popup modal state
   const [showAppsModal, setShowAppsModal] = useState(false);
   
@@ -48,14 +76,15 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
     let score = 0;
     if (fullName.trim()) score += 10;
     if (gmail.trim()) score += 10;
+    if (mobileNumber.trim()) score += 10;
     if (skillsStr.trim()) score += 10;
     if (selectedTools.length > 0) score += 10;
     if (languagesList.length > 0 && languagesList[0].language.trim()) score += 10;
     if (schooling.trim()) score += 10;
     if (aboutThem.trim()) score += 10;
-    if (projects.filter(p => p.title.trim()).length === 4) score += 10;
-    if (profile || resumeFile) score += 10;
-    if (profile || photoFile) score += 10;
+    if (projects.filter(p => p.title.trim()).length > 0) score += 10;
+    if (profile || resumeFile) score += 5;
+    if (profile || photoFile) score += 5;
     return Math.min(score, 100);
   };
 
@@ -73,8 +102,8 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
     if (profile) {
       setFullName(profile.fullName || '');
       setPosition(profile.position || 'Graphic Designer');
-      setExperienceType(profile.experienceType || 'months');
-      setExperienceValue(profile.experienceValue || 0);
+      setExperienceYears(profile.experienceYears || 0);
+      setExperienceMonths(profile.experienceMonths || 0);
       setSkillsStr(profile.skills ? profile.skills.join(', ') : '');
       setSelectedTools(profile.tools || []);
       setGmail(profile.gmail || '');
@@ -83,6 +112,8 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
       setWorkExperience(profile.workExperience || []);
       setAboutThem(profile.about_them || profile.aboutThem || '');
       setRelocate(profile.relocate || false);
+      setMobileNumber(profile.mobileNumber || '');
+      setJoiningDate(profile.joiningDate || '');
       
       if (Array.isArray(profile.languages) && profile.languages.length > 0) {
         setLanguagesList(profile.languages);
@@ -90,29 +121,35 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
         setLanguagesList([{ language: 'English', fluency: 'Fluent' }]);
       }
       
-      if (Array.isArray(profile.portfolioProjects) && profile.portfolioProjects.length >= 4) {
-        setProjects(profile.portfolioProjects);
+      if (Array.isArray(profile.portfolioProjects) && profile.portfolioProjects.length > 0) {
+        const mapped = [...profile.portfolioProjects];
+        while (mapped.length < 3) {
+          mapped.push({ title: '', description: '', link: '', fileUrl: '' });
+        }
+        setProjects(mapped.slice(0, 3));
       } else {
         setProjects([
-          { title: '', description: '', link: '' },
-          { title: '', description: '', link: '' },
-          { title: '', description: '', link: '' },
-          { title: '', description: '', link: '' }
+          { title: '', description: '', link: '', fileUrl: '' },
+          { title: '', description: '', link: '', fileUrl: '' },
+          { title: '', description: '', link: '', fileUrl: '' }
         ]);
       }
     } else {
-      // Default email to user's registered email
-      if (user) setGmail(user.email);
+      // Default info to user's registered details
+      if (user) {
+        setGmail(user.email || '');
+        setMobileNumber(user.mobile || '');
+        setFullName(user.name || '');
+      }
       setSchooling('');
       setWorkExperience([]);
       setAboutThem('');
       setRelocate(false);
       setLanguagesList([{ language: 'English', fluency: 'Fluent' }]);
       setProjects([
-        { title: '', description: '', link: '' },
-        { title: '', description: '', link: '' },
-        { title: '', description: '', link: '' },
-        { title: '', description: '', link: '' }
+        { title: '', description: '', link: '', fileUrl: '' },
+        { title: '', description: '', link: '', fileUrl: '' },
+        { title: '', description: '', link: '', fileUrl: '' }
       ]);
     }
   }, [profile, user]);
@@ -150,11 +187,10 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
     }
   };
 
-  // Adjust tools when position dropdown changes
   const handlePositionChange = (e) => {
     const pos = e.target.value;
     setPosition(pos);
-    setSelectedTools([]); // clear tools to avoid invalid tools mismatch
+    setSelectedTools([]); 
   };
 
   const handleWorkSamplesChange = (e) => {
@@ -204,6 +240,19 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
     setProjects(updated);
   };
 
+  const handleProjectFileChange = (idx, e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        setFormError(`Project #${idx + 1} file must be under 5MB.`);
+        return;
+      }
+      const updatedFiles = [...projectFiles];
+      updatedFiles[idx] = file;
+      setProjectFiles(updatedFiles);
+    }
+  };
+
   const handleAddLanguage = () => {
     setLanguagesList([...languagesList, { language: '', fluency: 'Beginner' }]);
   };
@@ -223,18 +272,20 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
     setFormError('');
     setFormSuccess('');
 
-    // Val experience bounds
-    const expVal = Number(experienceValue);
-    if (experienceType === 'months') {
-      if (expVal < 0 || expVal > 11) {
-        setFormError('Experience in months must be between 0 and 11.');
-        return;
-      }
-    } else {
-      if (expVal < 0 || expVal > 1) {
-        setFormError('Experience in years must be 0 or 1.');
-        return;
-      }
+    // Validate experience bounds
+    const yrs = Number(experienceYears);
+    const mths = Number(experienceMonths);
+    if (yrs < 0 || yrs > 1) {
+      setFormError('Experience in years must be 0 or 1.');
+      return;
+    }
+    if (mths < 0 || mths > 11) {
+      setFormError('Experience in months must be between 0 and 11.');
+      return;
+    }
+    if (yrs === 1 && mths > 0) {
+      setFormError('Hiring is limited to freshers with less than 1 year total experience.');
+      return;
     }
 
     if (selectedTools.length === 0) {
@@ -259,20 +310,20 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
       }
     }
 
-    // Validate 4 projects
-    for (let i = 0; i < 4; i++) {
-      const p = projects[i];
-      if (!p.title.trim() || !p.description.trim() || !p.link.trim()) {
-        setFormError(`Please fill in all details for Project #${i + 1}.`);
-        return;
-      }
+    // Validate at least 1 project is completed
+    const activeProjects = projects.filter(p => p.title.trim() !== '');
+    if (activeProjects.length === 0) {
+      setFormError('Please add at least one best project details.');
+      return;
     }
 
-    // Validate languages
-    for (let i = 0; i < languagesList.length; i++) {
-      if (!languagesList[i].language.trim()) {
-        setFormError(`Please enter a name for Language #${i + 1}.`);
-        return;
+    for (let i = 0; i < projects.length; i++) {
+      const p = projects[i];
+      if (p.title.trim()) {
+        if (!p.description.trim() || !p.link.trim()) {
+          setFormError(`Please complete all details (description and link) for Project #${i + 1}.`);
+          return;
+        }
       }
     }
 
@@ -319,8 +370,6 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
     const formData = new FormData();
     formData.append('fullName', fullName);
     formData.append('position', position);
-    formData.append('experienceType', experienceType);
-    formData.append('experienceValue', experienceValue);
     formData.append('skills', skillsStr);
     formData.append('tools', selectedTools.join(','));
     formData.append('gmail', gmail);
@@ -331,6 +380,12 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
     formData.append('aboutThem', aboutThem);
     formData.append('portfolioProjects', JSON.stringify(projects));
     formData.append('relocate', relocate);
+    formData.append('mobileNumber', mobileNumber);
+    formData.append('joiningDate', joiningDate);
+    formData.append('experienceYears', experienceYears);
+    formData.append('experienceMonths', experienceMonths);
+    formData.append('experienceType', 'months'); // legacy compatibility
+    formData.append('experienceValue', Number(experienceYears) * 12 + Number(experienceMonths)); // legacy compatibility
 
     if (resumeFile) formData.append('resume', resumeFile);
     if (photoFile) formData.append('photo', photoFile);
@@ -339,6 +394,11 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
         formData.append('workSamples', file);
       });
     }
+
+    // Optional project files uploads
+    if (projectFiles[0]) formData.append('projectFile0', projectFiles[0]);
+    if (projectFiles[1]) formData.append('projectFile1', projectFiles[1]);
+    if (projectFiles[2]) formData.append('projectFile2', projectFiles[2]);
 
     try {
       setFormLoading(true);
@@ -372,810 +432,903 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
     switch (status) {
       case 'cracked':
       case 'accepted':
-        return <span className="badge badge-success" style={{ fontWeight: 'bold' }}>🎉 CRACKED (Hired)</span>;
+        return <span style={{ fontWeight: 'bold', padding: '4px 10px', borderRadius: '12px', fontSize: '11px', backgroundColor: '#d1fae5', color: '#065f46' }}>🎉 CRACKED (Hired)</span>;
       case 'rejected':
-        return <span className="badge badge-error">Rejected</span>;
+        return <span style={{ padding: '4px 10px', borderRadius: '12px', fontSize: '11px', backgroundColor: '#fee2e2', color: '#991b1b' }}>Rejected</span>;
       default:
-        return <span className="badge badge-warning" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Clock size={12} /> Pending Review</span>;
+        return <span style={{ padding: '4px 10px', borderRadius: '12px', fontSize: '11px', backgroundColor: '#fef3c7', color: '#92400e', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Clock size={10} /> Pending Review</span>;
     }
   };
 
-  // Rendering logic: If no profile exists and not editing, show the Profile Creation modal/card
   const mustCreateProfile = !profile;
 
-  if (mustCreateProfile || editing) {
-    const currentToolsList = 
-      position === 'Graphic Designer' 
-        ? graphicTools 
-        : position === 'Motion Graphic Designer' 
-        ? motionTools 
-        : uiuxTools;
+  // Marquee Scroller Logo List
+  const marqueeLogos = [
+    { name: 'Procure', src: 'https://cdn.svgl.app/media/logos/procure.svg', grad: 'from-blue-500 to-indigo-600' },
+    { name: 'Shopify', src: 'https://cdn.svgl.app/media/logos/shopify.svg', grad: 'from-yellow-400 to-amber-500' },
+    { name: 'Blender', src: 'https://cdn.svgl.app/media/logos/blender.svg', grad: 'from-sky-400 to-blue-600' },
+    { name: 'Figma', src: 'https://cdn.svgl.app/media/logos/figma.svg', grad: 'from-purple-500 to-pink-500' },
+    { name: 'Spotify', src: 'https://cdn.svgl.app/media/logos/spotify.svg', grad: 'from-pink-500 to-rose-600' },
+    { name: 'Lottielab', src: 'https://cdn.svgl.app/media/logos/lottielab.svg', grad: 'from-emerald-400 to-yellow-400' },
+    { name: 'Google Cloud', src: 'https://cdn.svgl.app/media/logos/google-cloud.svg', grad: 'from-cyan-400 to-sky-500' },
+    { name: 'Bing', src: 'https://cdn.svgl.app/media/logos/bing.svg', grad: 'from-teal-400 to-cyan-500' }
+  ];
 
-    return (
-      <div className="container animate-fade-in" style={{ padding: '20px 0' }}>
-        <div className="card" style={{ maxWidth: '800px', margin: '0 auto', borderTop: '5px solid var(--accent)' }}>
-          <h2 style={{ fontSize: '28px', color: 'var(--text-main)', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <User style={{ color: 'var(--accent)' }} />
-            {profile ? 'Edit Your Seeker Profile' : 'Complete Seeker Profile (Required)'}
-          </h2>
-          <p style={{ color: 'var(--text-muted)', marginBottom: '30px' }}>
-            {profile 
-              ? 'Keep your tools and portfolio updated to stand out to Hiring Managers.' 
-              : 'Before applying to any job listing, you must set up your designer profile.'
-            }
-          </p>
+  return (
+    <div className="w-full min-h-screen py-10 px-4 md:px-8 font-sans">
+      
+      {/* 2. Main Hero Container & Video Background */}
+      <div className="relative w-full max-w-[1400px] mx-auto rounded-[48px] bg-white border border-slate-200/50 shadow-[0_40px_100px_-20px_rgba(0,0,0,0.03)] overflow-hidden h-[600px] flex flex-col">
+        
+        {/* Underlying video background layer */}
+        <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden select-none">
+          <video
+            autoPlay
+            loop
+            muted
+            playsInline
+            src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260505_101331_74f9b798-3f00-4e86-8a01-377aa16ffeaa.mp4"
+            className="w-full h-full object-cover scale-105 transition-transform duration-1000"
+          />
+        </div>
 
-          {/* Form Errors */}
-          {formError && (
-            <div className="card" style={{ backgroundColor: 'var(--error-bg)', color: 'var(--error)', padding: '16px', marginBottom: '20px', border: '1px solid var(--error)' }}>
-              <AlertTriangle size={18} style={{ verticalAlign: 'middle', marginRight: '8px' }} />
-              {formError}
-            </div>
-          )}
+        {/* 3. Hero Text Content Wrapper */}
+        <div className="relative z-20 flex-1 px-8 md:px-16 pt-12 md:pt-16 flex flex-col items-start justify-start">
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+            className="max-w-[650px] text-left"
+          >
+            <h1 className="font-display text-[42px] md:text-[56px] font-medium tracking-tight text-[#0a1b33] leading-none mb-4">
+              Foundation of the<br />new digital epoch
+            </h1>
+            <p className="font-sans text-[14px] md:text-[15px] text-[#64748b] leading-relaxed mb-6 max-w-[500px]">
+              Designing products, powering ecosystems and laying the foundation of a decentralized web for enterprises, builders and communities alike.
+            </p>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => {
+                const element = document.getElementById("profile-main-section");
+                if (element) {
+                  element.scrollIntoView({ behavior: 'smooth' });
+                }
+              }}
+              className="bg-[#0a152d] text-white font-semibold text-[13px] px-8 py-3.5 rounded-full shadow-md cursor-pointer hover:bg-[#111f3d] transition-colors"
+            >
+              Contact Us
+            </motion.button>
+          </motion.div>
+        </div>
 
-          {formSuccess && (
-            <div className="card" style={{ backgroundColor: 'var(--success-bg)', color: 'var(--success)', padding: '16px', marginBottom: '20px', border: '1px solid var(--success)' }}>
-              {formSuccess}
-            </div>
-          )}
-
-          {/* Profile Completeness Checklist */}
-          <div style={{ marginBottom: '25px', backgroundColor: '#f9fafb', padding: '20px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <span style={{ fontWeight: '700', fontSize: '14px', color: 'var(--text-main)' }}>Profile Completeness Checklist</span>
-              <span style={{ fontWeight: '800', fontSize: '15px', color: calculateCompleteness() === 100 ? 'var(--success)' : 'var(--primary)' }}>{calculateCompleteness()}%</span>
-            </div>
-            <div style={{ width: '100%', height: '8px', backgroundColor: '#e5e7eb', borderRadius: '4px', overflow: 'hidden', marginBottom: '16px' }}>
-              <div style={{ width: `${calculateCompleteness()}%`, height: '100%', backgroundColor: calculateCompleteness() === 100 ? 'var(--success)' : 'var(--primary)', transition: 'width 0.3s ease' }}></div>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px', fontSize: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: fullName.trim() ? 'var(--success)' : 'var(--text-light)' }}>
-                <CheckCircle size={14} style={{ color: fullName.trim() ? 'var(--success)' : '#ccc' }} />
-                <span>Full Name</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: gmail.trim() ? 'var(--success)' : 'var(--text-light)' }}>
-                <CheckCircle size={14} style={{ color: gmail.trim() ? 'var(--success)' : '#ccc' }} />
-                <span>Contact Gmail</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: skillsStr.trim() ? 'var(--success)' : 'var(--text-light)' }}>
-                <CheckCircle size={14} style={{ color: skillsStr.trim() ? 'var(--success)' : '#ccc' }} />
-                <span>Skills Tags</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: selectedTools.length > 0 ? 'var(--success)' : 'var(--text-light)' }}>
-                <CheckCircle size={14} style={{ color: selectedTools.length > 0 ? 'var(--success)' : '#ccc' }} />
-                <span>Software Tools Selected</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: languagesStr.trim() ? 'var(--success)' : 'var(--text-light)' }}>
-                <CheckCircle size={14} style={{ color: languagesStr.trim() ? 'var(--success)' : '#ccc' }} />
-                <span>Languages Known</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: schooling.trim() ? 'var(--success)' : 'var(--text-light)' }}>
-                <CheckCircle size={14} style={{ color: schooling.trim() ? 'var(--success)' : '#ccc' }} />
-                <span>Schooling Details</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: (profile || resumeFile) ? 'var(--success)' : 'var(--text-light)' }}>
-                <CheckCircle size={14} style={{ color: (profile || resumeFile) ? 'var(--success)' : '#ccc' }} />
-                <span>Resume PDF Uploaded</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: (profile || photoFile) ? 'var(--success)' : 'var(--text-light)' }}>
-                <CheckCircle size={14} style={{ color: (profile || photoFile) ? 'var(--success)' : '#ccc' }} />
-                <span>Photo & Work Samples</span>
-              </div>
-            </div>
-          </div>
-
-          <form onSubmit={handleSubmitProfile} encType="multipart/form-data">
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }} className="form-grid-2">
-              
-              {/* Full Name */}
-              <div className="form-group">
-                <label className="form-label">Full Name</label>
-                <input
-                  type="text"
-                  required
-                  className="form-control"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="e.g. Suryansh"
-                />
-              </div>
-
-              {/* Seeker Contact Gmail */}
-              <div className="form-group">
-                <label className="form-label">Gmail Address (For Application Alerts)</label>
-                <input
-                  type="email"
-                  required
-                  className="form-control"
-                  value={gmail}
-                  onChange={(e) => setGmail(e.target.value)}
-                  placeholder="name@gmail.com"
-                />
-              </div>
-
-              {/* Position */}
-              <div className="form-group">
-                <label className="form-label">Target Role Position</label>
-                <select className="form-control" value={position} onChange={handlePositionChange}>
-                  <option value="Graphic Designer">Graphic Designer</option>
-                  <option value="UI/UX Designer">UI/UX Designer</option>
-                  <option value="Motion Graphic Designer">Motion Graphic Designer</option>
-                </select>
-              </div>
-
-              {/* Experience */}
-              <div className="form-group">
-                <label className="form-label">Fresher Experience Level</label>
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <input
-                    type="number"
-                    required
-                    min={0}
-                    max={experienceType === 'months' ? 11 : 1}
-                    className="form-control"
-                    style={{ flex: 1 }}
-                    value={experienceValue}
-                    onChange={(e) => setExperienceValue(Number(e.target.value))}
-                  />
-                  <select
-                    className="form-control"
-                    style={{ flex: 1 }}
-                    value={experienceType}
-                    onChange={(e) => {
-                      setExperienceType(e.target.value);
-                      setExperienceValue(0); // reset
-                    }}
-                  >
-                    <option value="months">Months (0 - 11)</option>
-                    <option value="years">Years (0 - 1)</option>
-                  </select>
-                </div>
-                <small style={{ color: 'var(--text-light)', display: 'block', marginTop: '4px' }}>
-                  Only profiles with &lt; 1 year experience are accepted.
-                </small>
-              </div>
-
-              {/* Skills Tags */}
-              <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                <label className="form-label">Core Skills (Comma separated tags)</label>
-                <input
-                  type="text"
-                  required
-                  className="form-control"
-                  value={skillsStr}
-                  onChange={(e) => setSkillsStr(e.target.value)}
-                  placeholder="e.g. Wireframing, Brand Identity, Mobile Layouts, Prototyping"
-                />
-              </div>
-
-              {/* Tools Multi-Select */}
-              <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                <label className="form-label">Software/Tools Used (Select all that apply)</label>
-                <div className="checkbox-group">
-                  {currentToolsList.map((tool) => (
-                    <label key={tool} className="checkbox-label card" style={{
-                      padding: '10px 14px',
-                      cursor: 'pointer',
-                      border: selectedTools.includes(tool) ? '2px solid var(--accent)' : '1px solid var(--border-color)',
-                      backgroundColor: selectedTools.includes(tool) ? 'var(--accent-glow)' : 'transparent',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px'
-                    }}>
-                      <input
-                        type="checkbox"
-                        className="checkbox-input"
-                        checked={selectedTools.includes(tool)}
-                        onChange={() => handleToolToggle(tool)}
-                      />
-                      {tool}
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* About Them */}
-              <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                <label className="form-label">About Me / Bio (Required)</label>
-                <textarea
-                  required
-                  rows={3}
-                  className="form-control"
-                  value={aboutThem}
-                  onChange={(e) => setAboutThem(e.target.value)}
-                  placeholder="Tell hiring managers about your design style, background, and passion..."
-                />
-              </div>
-
-              {/* Schooling Details */}
-              <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                <label className="form-label">Schooling / Education Degree details (Required)</label>
-                <textarea
-                  required
-                  rows={2}
-                  className="form-control"
-                  value={schooling}
-                  onChange={(e) => setSchooling(e.target.value)}
-                  placeholder="e.g. Bachelor of Design (B.Des) from NID, Class of 2026, CGPA 8.2"
-                />
-              </div>
-
-              {/* Website URL */}
-              <div className="form-group">
-                <label className="form-label">Portfolio / Website Link (Optional)</label>
-                <input
-                  type="url"
-                  className="form-control"
-                  value={portfolioUrl}
-                  onChange={(e) => setPortfolioUrl(e.target.value)}
-                  placeholder="https://myportfolio.com"
-                />
-              </div>
-
-              {/* Relocation Checkbox */}
-              <div className="form-group" style={{ display: 'flex', alignItems: 'center' }}>
-                <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginTop: '30px' }}>
-                  <input
-                    type="checkbox"
-                    checked={relocate}
-                    onChange={(e) => setRelocate(e.target.checked)}
-                  />
-                  <span>Open to Relocate?</span>
-                </label>
-              </div>
-
-              {/* Languages Builder */}
-              <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                  <label className="form-label" style={{ marginBottom: 0 }}>Languages Known *</label>
-                  <button
-                    type="button"
-                    onClick={handleAddLanguage}
-                    className="btn btn-secondary"
-                    style={{ padding: '4px 10px', fontSize: '12px' }}
-                  >
-                    + Add Language
-                  </button>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {languagesList.map((lang, idx) => (
-                    <div key={idx} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Language (e.g. English)"
-                        className="form-control"
-                        value={lang.language}
-                        onChange={(e) => handleLanguageChange(idx, 'language', e.target.value)}
-                        style={{ flex: 2, padding: '8px 12px', fontSize: '13px' }}
-                      />
-                      <select
-                        className="form-control"
-                        value={lang.fluency}
-                        onChange={(e) => handleLanguageChange(idx, 'fluency', e.target.value)}
-                        style={{ flex: 1, padding: '8px 12px', fontSize: '13px' }}
-                      >
-                        <option value="Beginner">Beginner</option>
-                        <option value="Intermediate">Intermediate</option>
-                        <option value="Fluent">Fluent</option>
-                      </select>
-                      {languagesList.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveLanguage(idx)}
-                          className="btn btn-danger"
-                          style={{ padding: '8px', borderRadius: '4px', border: 'none', cursor: 'pointer' }}
-                        >
-                          ✕
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Top 4 Projects Builder */}
-              <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                <h3 style={{ fontSize: '16px', color: 'var(--text-main)', marginBottom: '12px', fontWeight: 'bold' }}>
-                  Top 4 Projects (All 4 Required)
-                </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {projects.map((proj, idx) => (
-                    <div key={idx} className="card" style={{ padding: '16px', backgroundColor: '#fafbfc', border: '1px solid var(--border-color)' }}>
-                      <h4 style={{ fontSize: '14px', marginBottom: '12px', color: 'var(--text-main)', fontWeight: 'bold' }}>Project #{idx + 1}</h4>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }} className="form-grid-2">
-                        <div className="form-group" style={{ marginBottom: '10px' }}>
-                          <label className="form-label" style={{ fontSize: '12px' }}>Project Title *</label>
-                          <input
-                            type="text"
-                            required
-                            className="form-control"
-                            style={{ padding: '8px 12px', fontSize: '13px' }}
-                            value={proj.title}
-                            onChange={(e) => handleProjectChange(idx, 'title', e.target.value)}
-                            placeholder="e.g. Mobile E-commerce UX Case Study"
-                          />
-                        </div>
-                        <div className="form-group" style={{ marginBottom: '10px' }}>
-                          <label className="form-label" style={{ fontSize: '12px' }}>Project Link *</label>
-                          <input
-                            type="url"
-                            required
-                            className="form-control"
-                            style={{ padding: '8px 12px', fontSize: '13px' }}
-                            value={proj.link}
-                            onChange={(e) => handleProjectChange(idx, 'link', e.target.value)}
-                            placeholder="https://behance.net/..."
-                          />
-                        </div>
-                        <div className="form-group" style={{ gridColumn: 'span 2', marginBottom: 0 }}>
-                          <label className="form-label" style={{ fontSize: '12px' }}>Project Description *</label>
-                          <textarea
-                            required
-                            rows={2}
-                            className="form-control"
-                            style={{ padding: '8px 12px', fontSize: '13px' }}
-                            value={proj.description}
-                            onChange={(e) => handleProjectChange(idx, 'description', e.target.value)}
-                            placeholder="Briefly describe your design process, research, and outputs..."
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Work Experience dynamic list builder */}
-              <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                  <label className="form-label" style={{ marginBottom: 0 }}>Previous Internships / Work Experience (Max 3, optional)</label>
-                  {workExperience.length < 3 && (
-                    <button
-                      type="button"
-                      onClick={handleAddExperience}
-                      className="btn btn-secondary"
-                      style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '6px 12px' }}
-                    >
-                      <Plus size={14} /> Add Experience
-                    </button>
-                  )}
-                </div>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {workExperience.length === 0 ? (
-                    <div style={{ padding: '16px', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-sm)', textAlign: 'center', color: 'var(--text-light)', fontSize: '13px' }}>
-                      No prior work experience added.
-                    </div>
-                  ) : (
-                    workExperience.map((exp, index) => (
-                      <div key={index} className="card" style={{ padding: '16px', backgroundColor: '#fafbfc', border: '1px solid var(--border-color)', position: 'relative' }}>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveExperience(index)}
-                          style={{ position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--error)' }}
-                          title="Remove Experience"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                        
-                        <h4 style={{ fontSize: '14px', marginBottom: '12px', color: 'var(--text-main)', fontWeight: 'bold' }}>Experience #{index + 1}</h4>
-                        
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }} className="form-grid-2">
-                          <div className="form-group" style={{ marginBottom: '10px' }}>
-                            <label className="form-label" style={{ fontSize: '12px' }}>Company Name *</label>
-                            <input
-                              type="text"
-                              required
-                              className="form-control"
-                              style={{ padding: '8px 12px', fontSize: '13px' }}
-                              value={exp.company}
-                              onChange={(e) => handleExperienceChange(index, 'company', e.target.value)}
-                              placeholder="e.g. Suryansh Tech Studio"
-                            />
-                          </div>
-                          
-                          <div className="form-group" style={{ marginBottom: '10px' }}>
-                            <label className="form-label" style={{ fontSize: '12px' }}>Role / Designation *</label>
-                            <input
-                              type="text"
-                              required
-                              className="form-control"
-                              style={{ padding: '8px 12px', fontSize: '13px' }}
-                              value={exp.role}
-                              onChange={(e) => handleExperienceChange(index, 'role', e.target.value)}
-                              placeholder="e.g. Junior Designer"
-                            />
-                          </div>
-                          
-                          <div className="form-group" style={{ marginBottom: '10px' }}>
-                            <label className="form-label" style={{ fontSize: '12px' }}>From Date *</label>
-                            <div style={{ display: 'flex', gap: '6px' }}>
-                              <select
-                                className="form-control"
-                                style={{ padding: '8px 12px', fontSize: '13px', flex: 1 }}
-                                value={exp.fromMonth}
-                                onChange={(e) => handleExperienceChange(index, 'fromMonth', e.target.value)}
-                              >
-                                {monthOptions.map(m => <option key={m} value={m}>{m}</option>)}
-                              </select>
-                              <select
-                                className="form-control"
-                                style={{ padding: '8px 12px', fontSize: '13px', flex: 1 }}
-                                value={exp.fromYear}
-                                onChange={(e) => handleExperienceChange(index, 'fromYear', e.target.value)}
-                              >
-                                {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
-                              </select>
-                            </div>
-                          </div>
-                          
-                          <div className="form-group" style={{ marginBottom: '10px' }}>
-                            <label className="form-label" style={{ fontSize: '12px' }}>To Date *</label>
-                            <div style={{ display: 'flex', gap: '6px' }}>
-                              <select
-                                className="form-control"
-                                style={{ padding: '8px 12px', fontSize: '13px', flex: 1 }}
-                                value={exp.toMonth}
-                                onChange={(e) => handleExperienceChange(index, 'toMonth', e.target.value)}
-                              >
-                                {monthOptions.map(m => <option key={m} value={m}>{m}</option>)}
-                              </select>
-                              <select
-                                className="form-control"
-                                style={{ padding: '8px 12px', fontSize: '13px', flex: 1 }}
-                                value={exp.toYear}
-                                onChange={(e) => handleExperienceChange(index, 'toYear', e.target.value)}
-                              >
-                                {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
-                              </select>
-                            </div>
-                          </div>
-                          
-                          <div className="form-group" style={{ gridColumn: 'span 2', marginBottom: 0 }}>
-                            <label className="form-label" style={{ fontSize: '12px' }}>Description / Responsibilities</label>
-                            <textarea
-                              rows={2}
-                              className="form-control"
-                              style={{ padding: '8px 12px', fontSize: '13px' }}
-                              value={exp.description}
-                              onChange={(e) => handleExperienceChange(index, 'description', e.target.value)}
-                              placeholder="Outline your work, tools used, and contributions..."
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              {/* Resume File */}
-              <div className="form-group">
-                <label className="form-label">Upload Resume PDF (PDF only, max 1MB {profile && '(Leave blank to keep current)'})</label>
-                <input
-                  type="file"
-                  accept="application/pdf"
-                  required={!profile}
-                  className="form-control"
-                  onChange={(e) => setResumeFile(e.target.files[0])}
-                />
-              </div>
-
-              {/* Profile Photo */}
-              <div className="form-group">
-                <label className="form-label">Profile Photo (JPG/JPEG only, max 2MB, "neat & clean" {profile && '(Leave blank to keep current)'})</label>
-                <input
-                  type="file"
-                  accept="image/jpeg,image/jpg"
-                  required={!profile}
-                  className="form-control"
-                  onChange={(e) => setPhotoFile(e.target.files[0])}
-                />
-                <small style={{ color: 'var(--text-light)', display: 'block', marginTop: '4px' }}>
-                  Please upload a neat, clean and professional headshot.
-                </small>
-              </div>
-
-              {/* Work Samples (3 images required) */}
-              <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                <label className="form-label">Upload Best 3 Work Samples (Must select exactly 3 images {profile && '(Leave blank to keep current)'})</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  required={!profile}
-                  className="form-control"
-                  onChange={handleWorkSamplesChange}
-                />
-                <small style={{ color: 'var(--text-light)', display: 'block', marginTop: '4px' }}>
-                  Please select 3 images simultaneously. Max size 3MB per image.
-                </small>
-              </div>
-
+        {/* 4. Floating Bottom Navbar */}
+        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-30 w-full max-w-[420px] px-4">
+          <motion.nav
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
+            className="flex items-center justify-between bg-white/90 backdrop-blur-2xl px-1.5 py-1.5 rounded-full shadow-[0_12px_40px_rgba(0,0,0,0.08)] border border-slate-200/40"
+          >
+            <div className="w-9 h-9 bg-white border border-slate-100 shadow-sm rounded-full flex items-center justify-center text-[#0a1b33] font-bold">
+              ✦
             </div>
 
-            {/* Actions */}
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '30px' }}>
-              {profile && (
-                <button type="button" onClick={() => setEditing(false)} className="btn btn-secondary">
-                  Cancel Edit
-                </button>
-              )}
-              <button type="submit" disabled={formLoading} className="btn btn-primary" style={{ padding: '10px 30px' }}>
-                {formLoading ? 'Saving Profile...' : 'Save Profile Details'}
+            <div className="flex gap-4">
+              <button 
+                onClick={() => navigate('/')}
+                className="text-[12px] font-semibold text-slate-500 hover:text-[#0a1b33] cursor-pointer"
+              >
+                Products
+              </button>
+              <button 
+                onClick={() => setShowAppsModal(true)}
+                className="text-[12px] font-semibold text-slate-500 hover:text-[#0a1b33] cursor-pointer"
+              >
+                Docs
               </button>
             </div>
-          </form>
-        </div>
-        <style dangerouslySetInnerHTML={{__html: `
-          @media (max-width: 768px) {
-            .form-grid-2 {
-              grid-template-columns: 1fr !important;
-            }
-            .form-grid-2 > div {
-              grid-column: span 1 !important;
-            }
-          }
-        `}} />
-      </div>
-    );
-  }
 
-  // Once profile is created, display Seeker's Dashboard Panel
-  return (
-    <div className="container animate-fade-in" style={{ padding: '20px 0' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '30px' }} className="seeker-dashboard-grid">
+            <button
+              onClick={() => {
+                const element = document.getElementById("profile-main-section");
+                if (element) element.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="bg-white px-5 py-2 rounded-full text-[12px] font-semibold text-[#0a1b33] border border-slate-200/60 shadow-sm hover:border-slate-300 transition-all flex items-center gap-1 cursor-pointer"
+            >
+              Get in touch <ChevronRight size={14} className="text-[#0a1b33]" />
+            </button>
+          </motion.nav>
+        </div>
+      </div>
+
+      {/* 5. Seamless Marquee Logo Scroller Component */}
+      <div className="relative w-full max-w-[1400px] mx-auto mt-10 overflow-hidden marquee-mask">
+        <div className="animate-marquee flex gap-6 py-2">
+          {/* Double list loop */}
+          {[...marqueeLogos, ...marqueeLogos].map((logo, index) => (
+            <div
+              key={index}
+              className="group relative h-24 w-40 shrink-0 flex items-center justify-center rounded-full bg-white border border-slate-200/60 shadow-sm hover:border-slate-300 transition-all overflow-hidden cursor-pointer"
+            >
+              {/* Dynamic Gradient Overlay */}
+              <div className={clsx(
+                "absolute inset-0 bg-gradient-to-tr opacity-0 scale-150 transition-all duration-300 ease-out group-hover:scale-100 group-hover:opacity-100 z-0",
+                logo.grad
+              )} />
+              
+              {/* Image */}
+              <img
+                src={logo.src}
+                alt={logo.name}
+                className="h-7 w-auto object-contain z-10 transition-all duration-300 group-hover:brightness-0 group-hover:invert"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Profile Form / Preview Container Section */}
+      <div id="profile-main-section" className="w-full max-w-[1200px] mx-auto mt-16 scroll-mt-6">
         
-        {/* Left Column: Seeker Profile details preview */}
-        <div>
-          <div className="card" style={{ padding: '30px', textAlign: 'center', borderTop: '4px solid var(--primary)', position: 'sticky', top: '90px' }}>
-            
-            {/* Candidate Photo */}
-            <div style={{ width: '120px', height: '120px', borderRadius: '50%', overflow: 'hidden', margin: '0 auto 16px auto', border: '3px solid var(--primary)' }}>
-              <img src={profile.photoUrl} alt={profile.fullName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        {/* If profile is missing or user is editing, render Editor Form */}
+        { (mustCreateProfile || editing) ? (
+          <div className="bg-white border border-slate-200/60 shadow-[0_10px_30px_rgba(0,0,0,0.02)] rounded-[32px] p-6 md:p-10">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h2 className="text-[28px] font-display font-semibold text-[#0a1b33] flex items-center gap-2">
+                  <User className="text-[#0a66c2]" />
+                  {profile ? 'Edit Designer Profile' : 'Setup Designer Profile (Required)'}
+                </h2>
+                <p className="text-[14px] text-slate-500 mt-1">
+                  Complete all details below to activate your candidate profile and apply to recruiter listings.
+                </p>
+              </div>
+              <button 
+                onClick={logout}
+                className="flex items-center gap-1.5 text-[12px] font-semibold text-[#ef4444] border border-red-200 hover:bg-red-50 px-4 py-2 rounded-full cursor-pointer transition-all"
+              >
+                <LogOut size={14} /> Log Out
+              </button>
             </div>
 
-            <h2 style={{ fontSize: '22px', color: 'var(--text-main)', marginBottom: '4px' }}>{profile.fullName}</h2>
-            <span className="badge badge-primary" style={{ marginBottom: '20px' }}>{profile.position}</span>
+            {formError && (
+              <div className="bg-red-50 text-red-700 border border-red-200 rounded-2xl p-4 mb-6 flex items-center gap-2 text-[14px]">
+                <AlertTriangle size={18} className="shrink-0" />
+                {formError}
+              </div>
+            )}
 
-            <div style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '14px', borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
-              <div>
-                <strong style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase' }}>About Me</strong>
-                <span style={{ display: 'block', whiteSpace: 'pre-line', lineHeight: '1.4' }}>{profile.about_them || profile.aboutThem}</span>
+            {formSuccess && (
+              <div className="bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-2xl p-4 mb-6 text-[14px]">
+                {formSuccess}
               </div>
-              
-              <div>
-                <strong style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase' }}>Experience</strong>
-                <span style={{ fontWeight: '600' }}>{profile.experienceValue} {profile.experienceType} (Fresher)</span>
-              </div>
-              
-              <div>
-                <strong style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase' }}>Gmail Address</strong>
-                <span>{profile.gmail}</span>
-              </div>
+            )}
 
-              <div>
-                <strong style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase' }}>Languages Known</strong>
-                <span>
-                  {Array.isArray(profile.languages) 
-                    ? profile.languages.map(l => `${l.language} (${l.fluency})`).join(', ')
-                    : String(profile.languages)}
-                </span>
+            {/* Checklist */}
+            <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6 mb-8">
+              <div className="flex justify-between items-center mb-3">
+                <span className="font-semibold text-[14px] text-[#0a1b33]">Profile Completeness Progress</span>
+                <span className="font-bold text-[14px] text-[#0a66c2]">{calculateCompleteness()}%</span>
               </div>
-
-              {profile.portfolioUrl && (
-                <div>
-                  <strong style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase' }}>Personal Website</strong>
-                  <a href={profile.portfolioUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '600' }}>
-                    <Globe size={14} /> View Portfolio
-                  </a>
+              <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden mb-4">
+                <div 
+                  className="h-full bg-gradient-to-r from-blue-500 to-[#0a66c2] transition-all duration-300"
+                  style={{ width: `${calculateCompleteness()}%` }}
+                />
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-[12px] text-slate-600">
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle size={14} className={clsx(fullName.trim() ? "text-emerald-500" : "text-slate-300")} />
+                  Full Name
                 </div>
-              )}
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle size={14} className={clsx(gmail.trim() ? "text-emerald-500" : "text-slate-300")} />
+                  Contact Gmail
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle size={14} className={clsx(mobileNumber.trim() ? "text-emerald-500" : "text-slate-300")} />
+                  Mobile Number
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle size={14} className={clsx(joiningDate.trim() ? "text-emerald-500" : "text-slate-300")} />
+                  Joining Date
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle size={14} className={clsx(skillsStr.trim() ? "text-emerald-500" : "text-slate-300")} />
+                  Skills Tags
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle size={14} className={clsx(selectedTools.length > 0 ? "text-emerald-500" : "text-slate-300")} />
+                  Software Tools
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle size={14} className={clsx(schooling.trim() ? "text-emerald-500" : "text-slate-300")} />
+                  Schooling / Ed
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle size={14} className={clsx((profile || resumeFile) ? "text-emerald-500" : "text-slate-300")} />
+                  Resume PDF
+                </div>
+              </div>
+            </div>
 
-              <div>
-                <strong style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase' }}>Open to Relocate?</strong>
-                <span>{profile.relocate ? '✅ Yes, willing to relocate' : '❌ No'}</span>
+            <form onSubmit={handleSubmitProfile} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                {/* Full Name */}
+                <div className="flex flex-col">
+                  <label className="text-[13px] font-semibold text-slate-700 mb-1.5">Full Name</label>
+                  <input
+                    type="text"
+                    required
+                    className="border border-slate-200 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:border-[#0a66c2] transition-colors"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="e.g. Suryansh Thakur"
+                  />
+                </div>
+
+                {/* Gmail */}
+                <div className="flex flex-col">
+                  <label className="text-[13px] font-semibold text-slate-700 mb-1.5">Gmail Address (For alerts)</label>
+                  <input
+                    type="email"
+                    required
+                    className="border border-slate-200 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:border-[#0a66c2] transition-colors"
+                    value={gmail}
+                    onChange={(e) => setGmail(e.target.value)}
+                    placeholder="name@gmail.com"
+                  />
+                </div>
+
+                {/* Mobile Number */}
+                <div className="flex flex-col">
+                  <label className="text-[13px] font-semibold text-slate-700 mb-1.5">Mobile Number</label>
+                  <input
+                    type="tel"
+                    required
+                    className="border border-slate-200 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:border-[#0a66c2] transition-colors"
+                    value={mobileNumber}
+                    onChange={(e) => setMobileNumber(e.target.value)}
+                    placeholder="e.g. +91 9999988888"
+                  />
+                </div>
+
+                {/* Target Role Position */}
+                <div className="flex flex-col">
+                  <label className="text-[13px] font-semibold text-slate-700 mb-1.5">Target Role Position</label>
+                  <select 
+                    className="border border-slate-200 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:border-[#0a66c2] transition-colors bg-white"
+                    value={position} 
+                    onChange={handlePositionChange}
+                  >
+                    <option value="Graphic Designer">Graphic Designer</option>
+                    <option value="UI/UX Designer">UI/UX Designer</option>
+                    <option value="Motion Graphic Designer">Motion Graphic Designer</option>
+                  </select>
+                </div>
+
+                {/* Experience in Both Years and Months */}
+                <div className="flex flex-col md:col-span-2">
+                  <label className="text-[13px] font-semibold text-slate-700 mb-1.5">Total Experience (Fresher Limits)</label>
+                  <div className="flex gap-4">
+                    <div className="flex-1 flex flex-col">
+                      <select
+                        className="border border-slate-200 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:border-[#0a66c2] transition-colors bg-white"
+                        value={experienceYears}
+                        onChange={(e) => setExperienceYears(Number(e.target.value))}
+                      >
+                        <option value={0}>0 Years</option>
+                        <option value={1}>1 Year</option>
+                      </select>
+                    </div>
+                    <div className="flex-1 flex flex-col">
+                      <select
+                        className="border border-slate-200 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:border-[#0a66c2] transition-colors bg-white"
+                        value={experienceMonths}
+                        onChange={(e) => setExperienceMonths(Number(e.target.value))}
+                      >
+                        {Array.from({ length: 12 }).map((_, m) => (
+                          <option key={m} value={m}>{m} Months</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <small className="text-[11px] text-slate-400 mt-1">
+                    * Note: This platform only registers designers with less than 1 year (0 years and months, or 1 year exactly with 0 months) experience.
+                  </small>
+                </div>
+
+                {/* Joining Date */}
+                <div className="flex flex-col">
+                  <label className="text-[13px] font-semibold text-slate-700 mb-1.5">Available to Join Date</label>
+                  <input
+                    type="date"
+                    required
+                    className="border border-slate-200 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:border-[#0a66c2] transition-colors bg-white"
+                    value={joiningDate}
+                    onChange={(e) => setJoiningDate(e.target.value)}
+                  />
+                </div>
+
+                {/* Personal Website */}
+                <div className="flex flex-col">
+                  <label className="text-[13px] font-semibold text-slate-700 mb-1.5">Personal Website / Portfolio Link (Optional)</label>
+                  <input
+                    type="url"
+                    className="border border-slate-200 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:border-[#0a66c2] transition-colors"
+                    value={portfolioUrl}
+                    onChange={(e) => setPortfolioUrl(e.target.value)}
+                    placeholder="https://myportfolio.com"
+                  />
+                </div>
+
+                {/* Skills tags */}
+                <div className="flex flex-col md:col-span-2">
+                  <label className="text-[13px] font-semibold text-slate-700 mb-1.5">Core Skills (Comma separated)</label>
+                  <input
+                    type="text"
+                    required
+                    className="border border-slate-200 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:border-[#0a66c2] transition-colors"
+                    value={skillsStr}
+                    onChange={(e) => setSkillsStr(e.target.value)}
+                    placeholder="e.g. Wireframing, 3D Animation, Figma Prototyping, Brand Design"
+                  />
+                </div>
+
+                {/* Tools Selection checkboxes */}
+                <div className="flex flex-col md:col-span-2">
+                  <label className="text-[13px] font-semibold text-slate-700 mb-2">Software Tools Used (Select all that apply)</label>
+                  <div className="flex flex-wrap gap-2.5">
+                    {(position === 'Graphic Designer' ? graphicTools : position === 'Motion Graphic Designer' ? motionTools : uiuxTools).map(tool => (
+                      <button
+                        type="button"
+                        key={tool}
+                        onClick={() => handleToolToggle(tool)}
+                        className={clsx(
+                          "px-4 py-2 rounded-xl text-[13px] font-medium border transition-all cursor-pointer",
+                          selectedTools.includes(tool)
+                            ? "bg-blue-50 border-[#0a66c2] text-[#0a66c2] shadow-sm"
+                            : "bg-white border-slate-200 text-slate-600 hover:border-slate-300"
+                        )}
+                      >
+                        {tool}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* About Me Bio */}
+                <div className="flex flex-col md:col-span-2">
+                  <label className="text-[13px] font-semibold text-slate-700 mb-1.5">About Me / Bio</label>
+                  <textarea
+                    required
+                    rows={3}
+                    className="border border-slate-200 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:border-[#0a66c2] transition-colors"
+                    value={aboutThem}
+                    onChange={(e) => setAboutThem(e.target.value)}
+                    placeholder="Write a short description about yourself, your design path, and key achievements..."
+                  />
+                </div>
+
+                {/* Education Schooling */}
+                <div className="flex flex-col md:col-span-2">
+                  <label className="text-[13px] font-semibold text-slate-700 mb-1.5">Schooling / Education Details</label>
+                  <textarea
+                    required
+                    rows={2}
+                    className="border border-slate-200 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:border-[#0a66c2] transition-colors"
+                    value={schooling}
+                    onChange={(e) => setSchooling(e.target.value)}
+                    placeholder="e.g. B.Des in UI/UX from National Institute of Design, Class of 2026"
+                  />
+                </div>
+
+                {/* Relocation checkbox */}
+                <div className="flex items-center md:col-span-2 py-2">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 rounded border-slate-300 text-[#0a66c2]"
+                      checked={relocate}
+                      onChange={(e) => setRelocate(e.target.checked)}
+                    />
+                    <span className="text-[13px] font-medium text-slate-600">I am open to relocate for on-site/hybrid positions</span>
+                  </label>
+                </div>
+
+                {/* Languages Known list builder */}
+                <div className="flex flex-col md:col-span-2 border-t border-slate-100 pt-6">
+                  <div className="flex justify-between items-center mb-3">
+                    <label className="text-[14px] font-semibold text-slate-700">Languages Known</label>
+                    <button
+                      type="button"
+                      onClick={handleAddLanguage}
+                      className="text-[12px] font-semibold text-[#0a66c2] border border-blue-200 hover:bg-blue-50 px-3 py-1.5 rounded-full cursor-pointer transition-colors"
+                    >
+                      + Add Language
+                    </button>
+                  </div>
+                  <div className="space-y-3">
+                    {languagesList.map((lang, idx) => (
+                      <div key={idx} className="flex gap-3 items-center">
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. English, Hindi"
+                          className="flex-[2] border border-slate-200 rounded-xl px-4 py-2 text-[13px] focus:outline-none focus:border-[#0a66c2]"
+                          value={lang.language}
+                          onChange={(e) => handleLanguageChange(idx, 'language', e.target.value)}
+                        />
+                        <select
+                          className="flex-[1] border border-slate-200 rounded-xl px-4 py-2 text-[13px] focus:outline-none focus:border-[#0a66c2] bg-white"
+                          value={lang.fluency}
+                          onChange={(e) => handleLanguageChange(idx, 'fluency', e.target.value)}
+                        >
+                          <option value="Beginner">Beginner</option>
+                          <option value="Intermediate">Intermediate</option>
+                          <option value="Fluent">Fluent</option>
+                        </select>
+                        {languagesList.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveLanguage(idx)}
+                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg cursor-pointer"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Up to 3 best Projects with optional file uploads */}
+                <div className="flex flex-col md:col-span-2 border-t border-slate-100 pt-6">
+                  <h3 className="text-[15px] font-bold text-[#0a1b33] mb-4">
+                    Top 3 Best Projects (At least 1 required)
+                  </h3>
+                  <div className="space-y-4">
+                    {projects.map((proj, idx) => (
+                      <div key={idx} className="bg-slate-50 border border-slate-200/50 rounded-2xl p-5">
+                        <h4 className="text-[13px] font-bold text-slate-700 mb-3">Project #{idx + 1}</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          
+                          <div className="flex flex-col">
+                            <label className="text-[11px] font-semibold text-slate-500 mb-1">Project Title {idx === 0 && '*'}</label>
+                            <input
+                              type="text"
+                              required={idx === 0}
+                              className="border border-slate-200 rounded-xl px-3 py-2 text-[13px] focus:outline-none focus:border-[#0a66c2] bg-white"
+                              value={proj.title}
+                              onChange={(e) => handleProjectChange(idx, 'title', e.target.value)}
+                              placeholder="e.g. Branding Design Case Study"
+                            />
+                          </div>
+
+                          <div className="flex flex-col">
+                            <label className="text-[11px] font-semibold text-slate-500 mb-1">Website Link {idx === 0 && '*'}</label>
+                            <input
+                              type="url"
+                              required={idx === 0}
+                              className="border border-slate-200 rounded-xl px-3 py-2 text-[13px] focus:outline-none focus:border-[#0a66c2] bg-white"
+                              value={proj.link}
+                              onChange={(e) => handleProjectChange(idx, 'link', e.target.value)}
+                              placeholder="https://behance.net/..."
+                            />
+                          </div>
+
+                          <div className="flex flex-col md:col-span-2">
+                            <label className="text-[11px] font-semibold text-slate-500 mb-1">Project Description {idx === 0 && '*'}</label>
+                            <textarea
+                              required={idx === 0}
+                              rows={2}
+                              className="border border-slate-200 rounded-xl px-3 py-2 text-[13px] focus:outline-none focus:border-[#0a66c2] bg-white"
+                              value={proj.description}
+                              onChange={(e) => handleProjectChange(idx, 'description', e.target.value)}
+                              placeholder="Explain your approach, tools and output..."
+                            />
+                          </div>
+
+                          {/* Optional project file upload */}
+                          <div className="flex flex-col md:col-span-2">
+                            <label className="text-[11px] font-semibold text-slate-500 mb-1">
+                              Project Output File / Demo File (Optional)
+                            </label>
+                            <div className="flex items-center gap-3">
+                              <input
+                                type="file"
+                                className="border border-slate-200 rounded-xl px-3 py-1.5 text-[12px] focus:outline-none focus:border-[#0a66c2] bg-white flex-1"
+                                onChange={(e) => handleProjectFileChange(idx, e)}
+                              />
+                              {proj.fileUrl && (
+                                <a 
+                                  href={proj.fileUrl} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="text-[11px] font-semibold text-[#0a66c2] hover:underline"
+                                >
+                                  View Current File
+                                </a>
+                              )}
+                            </div>
+                            <small className="text-[10px] text-slate-400 mt-0.5">
+                              Upload PDF, images, or zip archive up to 5MB.
+                            </small>
+                          </div>
+
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Upload Section for profile items */}
+                <div className="flex flex-col border-t border-slate-100 pt-6">
+                  <label className="text-[13px] font-semibold text-slate-700 mb-1">Upload Resume PDF *</label>
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    required={!profile}
+                    className="border border-slate-200 rounded-xl px-3 py-2 text-[13px]"
+                    onChange={(e) => setResumeFile(e.target.files[0])}
+                  />
+                  <small className="text-[11px] text-slate-400 mt-1">PDF format only. Max size 1MB.</small>
+                </div>
+
+                <div className="flex flex-col border-t border-slate-100 pt-6">
+                  <label className="text-[13px] font-semibold text-slate-700 mb-1">Upload Headshot Profile Photo *</label>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/jpg"
+                    required={!profile}
+                    className="border border-slate-200 rounded-xl px-3 py-2 text-[13px]"
+                    onChange={(e) => setPhotoFile(e.target.files[0])}
+                  />
+                  <small className="text-[11px] text-slate-400 mt-1">JPG/JPEG format only. Max size 2MB.</small>
+                </div>
+
+                <div className="flex flex-col md:col-span-2 border-t border-slate-100 pt-6">
+                  <label className="text-[13px] font-semibold text-slate-700 mb-1">Upload 3 Portfolio Work Sample Images *</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    required={!profile}
+                    className="border border-slate-200 rounded-xl px-3 py-2 text-[13px]"
+                    onChange={handleWorkSamplesChange}
+                  />
+                  <small className="text-[11px] text-slate-400 mt-1">Must select exactly 3 images simultaneously. Max size 3MB per image.</small>
+                </div>
+
               </div>
 
-              <div>
-                <strong style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase' }}>Schooling / Education Details</strong>
-                <span>{profile.schooling}</span>
+              {/* Actions */}
+              <div className="flex gap-4 justify-end pt-6 border-t border-slate-100">
+                {profile && (
+                  <button
+                    type="button"
+                    onClick={() => setEditing(false)}
+                    className="border border-slate-200 hover:bg-slate-50 px-6 py-2.5 rounded-full text-[13px] font-semibold cursor-pointer transition-colors"
+                  >
+                    Cancel Edit
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  disabled={formLoading}
+                  className="bg-[#0a66c2] text-white hover:bg-[#004182] px-8 py-2.5 rounded-full text-[13px] font-semibold cursor-pointer transition-colors"
+                >
+                  {formLoading ? 'Saving Profile...' : 'Save Profile Details'}
+                </button>
+              </div>
+            </form>
+          </div>
+        ) : (
+          /* Profile Details Preview Mode */
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            {/* Left Preview Column */}
+            <div className="lg:col-span-1 space-y-6">
+              <div className="bg-white border border-slate-200/60 shadow-[0_10px_30px_rgba(0,0,0,0.02)] rounded-[32px] p-6 text-center sticky top-24">
+                
+                {/* Photo Preview */}
+                <div className="w-28 h-28 rounded-full overflow-hidden mx-auto mb-4 border-2 border-[#0a66c2]">
+                  <img 
+                    src={profile.photoUrl} 
+                    alt={profile.fullName} 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+
+                <h2 className="text-[20px] font-display font-semibold text-[#0a1b33]">{profile.fullName}</h2>
+                <span className="inline-block bg-blue-50 text-[#0a66c2] text-[11px] font-bold px-3 py-1 rounded-full mt-1">
+                  {profile.position}
+                </span>
+
+                <div className="mt-6 pt-6 border-t border-slate-100 text-left space-y-4 text-[13px] text-slate-700">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Bio Description</span>
+                    <p className="line-height-1.4 text-slate-600 white-space-pre-line">{profile.about_them || profile.aboutThem}</p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Briefcase size={16} className="text-slate-400" />
+                    <div>
+                      <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Total Experience</span>
+                      <span className="font-semibold text-slate-600">
+                        {profile.experienceYears} yrs {profile.experienceMonths} mths
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Phone size={16} className="text-slate-400" />
+                    <div>
+                      <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Mobile Number</span>
+                      <span className="font-semibold text-slate-600">{profile.mobileNumber || 'Not provided'}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Mail size={16} className="text-slate-400" />
+                    <div>
+                      <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Gmail Address</span>
+                      <span className="font-semibold text-slate-600">{profile.gmail}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Calendar size={16} className="text-slate-400" />
+                    <div>
+                      <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Available to Join</span>
+                      <span className="font-semibold text-slate-600">
+                        {profile.joiningDate ? new Date(profile.joiningDate).toLocaleDateString(undefined, { dateStyle: 'medium' }) : 'Immediate'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Languages Known</span>
+                    <span className="font-medium text-slate-600">
+                      {Array.isArray(profile.languages)
+                        ? profile.languages.map(l => `${l.language} (${l.fluency})`).join(', ')
+                        : String(profile.languages)}
+                    </span>
+                  </div>
+
+                  {profile.portfolioUrl && (
+                    <div className="flex items-center gap-2">
+                      <Globe size={16} className="text-slate-400" />
+                      <a href={profile.portfolioUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-[#0a66c2] hover:underline">
+                        View Portfolio Website
+                      </a>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2">
+                    <CheckCircle size={16} className="text-slate-400" />
+                    <span>Open to relocate: {profile.relocate ? '✅ Yes' : '❌ No'}</span>
+                  </div>
+
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Education Schooling</span>
+                    <p className="text-slate-600 font-medium">{profile.schooling}</p>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-2">
+                    <FileText size={16} className="text-red-500" />
+                    <a href={profile.resumeUrl} target="_blank" rel="noopener noreferrer" className="font-bold text-red-500 hover:underline">
+                      Open Resume PDF Document
+                    </a>
+                  </div>
+                </div>
+
+                <div className="mt-6 pt-6 border-t border-slate-100 flex flex-col gap-2">
+                  <button 
+                    onClick={() => setEditing(true)} 
+                    className="w-full bg-slate-50 border border-slate-200 hover:bg-slate-100 text-[#0a1b33] font-semibold py-2.5 rounded-full text-[13px] cursor-pointer transition-colors"
+                  >
+                    Edit Profile Details
+                  </button>
+                  <button
+                    onClick={logout}
+                    className="w-full bg-red-50 border border-red-100 hover:bg-red-100 text-red-600 font-semibold py-2.5 rounded-full text-[13px] cursor-pointer transition-colors"
+                  >
+                    Log Out Session
+                  </button>
+                </div>
+
+              </div>
+            </div>
+
+            {/* Right Preview Column */}
+            <div className="lg:col-span-2 space-y-6">
+              
+              {/* Applications Alert Card */}
+              <div className="bg-white border border-slate-200/60 shadow-[0_10px_30px_rgba(0,0,0,0.02)] rounded-[32px] p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-[18px] font-display font-semibold text-[#0a1b33] flex items-center gap-2">
+                    <BookOpen size={18} className="text-[#0a66c2]" />
+                    Job Application Statuses
+                  </h3>
+                  <p className="text-[13px] text-slate-500 mt-0.5">
+                    Track the progress of your submitted design job applications.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowAppsModal(true)}
+                  className="bg-[#0a66c2] text-white hover:bg-[#004182] font-semibold text-[13px] px-6 py-2.5 rounded-full cursor-pointer transition-colors shrink-0"
+                >
+                  Track {applications.length} Applications
+                </button>
               </div>
 
-              <div>
-                <strong style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase' }}>Resume PDF</strong>
-                <a href={profile.resumeUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '600', color: 'var(--accent)' }}>
-                  <FileText size={14} /> Open Resume PDF
-                </a>
+              {/* Core Skills Tags & Software Tools */}
+              <div className="bg-white border border-slate-200/60 shadow-[0_10px_30px_rgba(0,0,0,0.02)] rounded-[32px] p-6">
+                <h3 className="text-[16px] font-display font-semibold text-[#0a1b33] mb-4 flex items-center gap-2">
+                  ✦ Core Software & Design Skills
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Design Methods & Skills</span>
+                    <div className="flex flex-wrap gap-2">
+                      {profile.skills.map((s, idx) => (
+                        <span key={idx} className="bg-slate-50 text-slate-700 text-[12px] font-medium px-3 py-1.5 rounded-xl border border-slate-100">
+                          {s}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Software Tools</span>
+                    <div className="flex flex-wrap gap-2">
+                      {profile.tools.map((t, idx) => (
+                        <span key={idx} className="bg-blue-50 text-[#0a66c2] text-[12px] font-bold px-3 py-1.5 rounded-xl border border-blue-100">
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <strong style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase', marginBottom: '6px' }}>Software & Tools Known</strong>
-                <div className="tag-list">
-                  {profile.tools.map((t, idx) => (
-                    <span key={idx} className="badge" style={{ backgroundColor: 'var(--primary-light)', color: 'var(--primary)', fontWeight: 'bold' }}>{t}</span>
+              {/* 3 Best Projects Grid */}
+              <div className="bg-white border border-slate-200/60 shadow-[0_10px_30px_rgba(0,0,0,0.02)] rounded-[32px] p-6">
+                <h3 className="text-[16px] font-display font-semibold text-[#0a1b33] mb-4 flex items-center gap-2">
+                  ✦ Top 3 Best Projects
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {profile.portfolioProjects && profile.portfolioProjects.filter(p => p.title.trim()).map((proj, idx) => (
+                    <div key={idx} className="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex flex-col justify-between">
+                      <div>
+                        <div className="flex justify-between items-start gap-2 mb-2">
+                          <h4 className="font-bold text-[14px] text-slate-700 leading-tight">{proj.title}</h4>
+                          <span className="text-[10px] text-slate-400 font-semibold uppercase">#{idx + 1}</span>
+                        </div>
+                        <p className="text-[12px] text-slate-600 leading-relaxed mb-4">{proj.description}</p>
+                      </div>
+                      
+                      <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-200/50">
+                        <a 
+                          href={proj.link} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="text-[12px] font-semibold text-[#0a66c2] hover:underline"
+                        >
+                          Website Link ↗
+                        </a>
+                        
+                        {proj.fileUrl && (
+                          <a
+                            href={proj.fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[11px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-lg px-2.5 py-1 hover:bg-emerald-100 transition-colors"
+                          >
+                            Download File
+                          </a>
+                        )}
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
 
+              {/* 3 Work Samples Gallery */}
+              <div className="bg-white border border-slate-200/60 shadow-[0_10px_30px_rgba(0,0,0,0.02)] rounded-[32px] p-6">
+                <h3 className="text-[16px] font-display font-semibold text-[#0a1b33] mb-4 flex items-center gap-2">
+                  ✦ Selected Portfolio Work Samples
+                </h3>
+                <div className="grid grid-cols-3 gap-4">
+                  {profile.workSamples && profile.workSamples.map((img, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => setLightboxImage(img)}
+                      className="group relative aspectRatio-4/3 rounded-2xl overflow-hidden border border-slate-200 cursor-pointer shadow-sm"
+                    >
+                      <img src={img} alt={`Sample ${idx + 1}`} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                      <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[12px] font-bold gap-1">
+                        <Eye size={14} /> Zoom
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Work Experience Timeline */}
               {profile.workExperience && profile.workExperience.length > 0 && (
-                <div>
-                  <strong style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase', marginBottom: '6px' }}>Work Experience</strong>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div className="bg-white border border-slate-200/60 shadow-[0_10px_30px_rgba(0,0,0,0.02)] rounded-[32px] p-6">
+                  <h3 className="text-[16px] font-display font-semibold text-[#0a1b33] mb-4 flex items-center gap-2">
+                    ✦ Internships / Work Experience History
+                  </h3>
+                  <div className="space-y-4">
                     {profile.workExperience.map((exp, idx) => (
-                      <div key={idx} style={{ fontSize: '12px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '10px', backgroundColor: '#fafbfc' }}>
-                        <div style={{ fontWeight: 'bold', color: 'var(--text-main)' }}>{exp.role}</div>
-                        <div style={{ color: 'var(--accent)', fontWeight: '600' }}>{exp.company}</div>
-                        <div style={{ color: 'var(--text-light)', fontSize: '10px', marginBottom: '4px' }}>{exp.fromMonth}/{exp.fromYear} – {exp.toMonth}/{exp.toYear}</div>
-                        {exp.description && <div style={{ color: 'var(--text-muted)', lineHeight: '1.4' }}>{exp.description}</div>}
+                      <div key={idx} className="border-l-2 border-slate-100 pl-4 py-1 relative">
+                        <div className="absolute w-2.5 h-2.5 rounded-full bg-blue-500 -left-[6px] top-2" />
+                        <h4 className="font-bold text-[14px] text-slate-800">{exp.role}</h4>
+                        <div className="text-[12px] font-semibold text-[#0a66c2]">{exp.company}</div>
+                        <div className="text-[11px] text-slate-400 mt-0.5 mb-1.5">{exp.fromMonth}/{exp.fromYear} – {exp.toMonth}/{exp.toYear}</div>
+                        {exp.description && <p className="text-[12px] text-slate-600 leading-relaxed">{exp.description}</p>}
                       </div>
                     ))}
                   </div>
                 </div>
               )}
+
             </div>
 
-            <button onClick={() => setEditing(true)} className="btn btn-outline" style={{ width: '100%', marginTop: '24px' }}>
-              Edit Profile details
-            </button>
           </div>
-        </div>
-
-        {/* Right Column: Applications Tracker & Action block */}
-        <div>
-          
-          {/* Track Applications Modal Trigger Card */}
-          <div className="card" style={{ marginBottom: '30px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 30px' }}>
-            <div>
-              <h3 style={{ fontSize: '18px', color: 'var(--text-main)', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <BookOpen size={18} style={{ color: 'var(--primary)' }} />
-                Application History
-              </h3>
-              <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: 0 }}>
-                You have applied to {applications.length} jobs.
-              </p>
-            </div>
-            <button 
-              onClick={() => setShowAppsModal(true)} 
-              className="btn btn-primary"
-              style={{ padding: '10px 20px', fontSize: '14px' }}
-            >
-              Track Applications
-            </button>
-          </div>
-
-          {/* Top 4 Portfolio Projects Grid */}
-          <div className="card" style={{ marginBottom: '30px' }}>
-            <h3 style={{ fontSize: '18px', color: 'var(--text-main)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Globe size={18} style={{ color: 'var(--accent)' }} />
-              Top 4 Portfolio Projects
-            </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
-              {profile.portfolioProjects && profile.portfolioProjects.map((proj, idx) => (
-                <div key={idx} className="card" style={{ padding: '16px', backgroundColor: '#fafbfc', border: '1px solid var(--border-color)' }}>
-                  <h4 style={{ fontSize: '15px', color: 'var(--text-main)', margin: '0 0 6px 0', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    {proj.title}
-                    <a href={proj.link} target="_blank" rel="noopener noreferrer" style={{ fontSize: '12px', color: 'var(--accent)', fontWeight: 'bold' }}>
-                      Link ↗
-                    </a>
-                  </h4>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: 0, lineHeight: '1.4' }}>
-                    {proj.description}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-          
-          {/* Work samples Gallery Grid */}
-          <div className="card" style={{ marginBottom: '30px' }}>
-            <h3 style={{ fontSize: '18px', color: 'var(--text-main)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Image size={18} style={{ color: 'var(--accent)' }} />
-              Your 3 Portfolio Work Samples (Click to Zoom)
-            </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
-              {profile.workSamples.map((img, idx) => (
-                <div 
-                  key={idx} 
-                  onClick={() => setLightboxImage(img)}
-                  style={{ 
-                    aspectRatio: '4/3', 
-                    borderRadius: 'var(--radius-sm)', 
-                    overflow: 'hidden', 
-                    border: '1px solid var(--border-color)', 
-                    cursor: 'pointer',
-                    position: 'relative'
-                  }}
-                  className="portfolio-thumb"
-                >
-                  <img src={img} alt={`Work Sample ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  <div className="zoom-overlay" style={{
-                    position: 'absolute',
-                    top: 0, left: 0, right: 0, bottom: 0,
-                    background: 'rgba(0,0,0,0.3)',
-                    opacity: 0,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'white',
-                    fontSize: '12px',
-                    fontWeight: 'bold',
-                    transition: 'var(--transition)'
-                  }}>
-                    🔍 View Large
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-        </div>
+        )}
 
       </div>
 
       {/* Track Applications Pop-up Modal */}
       {showAppsModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 2000,
-          padding: '20px'
-        }} onClick={() => setShowAppsModal(false)}>
-          <div style={{
-            backgroundColor: 'white',
-            borderRadius: 'var(--radius-lg)',
-            width: '100%',
-            maxWidth: '650px',
-            maxHeight: '85vh',
-            overflowY: 'auto',
-            padding: '30px',
-            position: 'relative'
-          }} onClick={(e) => e.stopPropagation()}>
+        <div 
+          onClick={() => setShowAppsModal(false)}
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 animate-fade-in"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white border border-slate-200/60 shadow-xl rounded-[32px] p-6 md:p-8 w-full max-w-[600px] max-h-[80vh] overflow-y-auto relative"
+          >
             <button
               onClick={() => setShowAppsModal(false)}
-              style={{ position: 'absolute', top: '20px', right: '20px', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '18px' }}
+              className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 font-bold text-[18px] cursor-pointer"
             >
               ✕
             </button>
-            <h2 style={{ fontSize: '22px', color: 'var(--text-main)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Clock size={20} style={{ color: 'var(--primary)' }} />
+            
+            <h2 className="text-[22px] font-display font-semibold text-[#0a1b33] mb-2 flex items-center gap-2">
+              <Clock size={20} className="text-[#0a66c2]" />
               Track Applications
             </h2>
-            <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '20px' }}>
-              Monitor the status of your submitted job applications.
+            <p className="text-[13px] text-slate-500 mb-6">
+              Review and audit feedback on your submitted design applications.
             </p>
 
             {loadingApps ? (
-              <div style={{ textAlign: 'center', padding: '30px 0' }}>Loading applications...</div>
+              <div className="text-center py-10 text-[14px] text-slate-500 font-medium">Loading applications...</div>
             ) : applications.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-light)', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-md)' }}>
-                You haven't applied to any job listings yet.
+              <div className="text-center py-10 border border-dashed border-slate-200 rounded-2xl text-[13px] text-slate-400">
+                You have not submitted any job applications yet.
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div className="space-y-3">
                 {applications.map((app) => (
-                  <div key={app._id} className="card" style={{ padding: '16px 20px', backgroundColor: '#fafbfc', border: '1px solid var(--border-color)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
-                      <div>
-                        <h4 style={{ fontSize: '15px', color: 'var(--text-main)', margin: 0, fontWeight: 'bold' }}>
-                          {app.job ? app.job.title : 'Position'}
-                        </h4>
-                        <span style={{ fontSize: '13px', color: 'var(--accent)', fontWeight: '600' }}>
-                          {app.job ? app.job.companyName : 'Company'}
-                        </span>
-                      </div>
-                      <div>
-                        {getStatusBadge(app.status)}
+                  <div key={app._id} className="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                      <h4 className="font-bold text-[14px] text-slate-800">{app.job ? app.job.title : 'Position'}</h4>
+                      <span className="text-[12px] font-semibold text-[#0a66c2]">{app.job ? app.job.companyName : 'Company'}</span>
+                      <div className="flex gap-4 text-[10px] text-slate-400 mt-1">
+                        <span>📅 Applied: {new Date(app.appliedAt).toLocaleDateString()}</span>
+                        <span>📍 {app.job ? app.job.location : ''}</span>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-light)' }}>
-                      <span>📅 Applied on: {new Date(app.appliedAt).toLocaleDateString()}</span>
-                      <span>📍 {app.job ? app.job.location : ''}</span>
+                    <div className="shrink-0">
+                      {getStatusBadge(app.status)}
                     </div>
                   </div>
                 ))}
@@ -1189,34 +1342,17 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
       {lightboxImage && (
         <div 
           onClick={() => setLightboxImage(null)}
-          style={{
-            position: 'fixed',
-            top: 0, left: 0, right: 0, bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.85)',
-            zIndex: 9999,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'zoom-out'
-          }}
+          className="fixed inset-0 bg-black/90 z-[10000] flex items-center justify-center p-4 cursor-zoom-out"
         >
-          <div style={{ position: 'relative', maxWidth: '90%', maxHeight: '90%' }} onClick={(e) => e.stopPropagation()}>
+          <div className="relative max-w-[95%] max-h-[95%]" onClick={(e) => e.stopPropagation()}>
             <img 
               src={lightboxImage} 
-              alt="Zoomed Work Sample" 
-              style={{ maxWidth: '100%', maxHeight: '80vh', borderRadius: '8px', objectFit: 'contain' }} 
+              alt="Zoomed Sample" 
+              className="max-w-full max-h-[85vh] rounded-xl object-contain shadow-2xl" 
             />
             <button 
               onClick={() => setLightboxImage(null)}
-              className="btn btn-secondary"
-              style={{
-                position: 'absolute',
-                top: '-50px',
-                right: '0',
-                padding: '6px 14px',
-                borderRadius: '20px',
-                fontSize: '12px'
-              }}
+              className="absolute -top-12 right-0 bg-white/10 hover:bg-white/20 text-white font-semibold text-[12px] px-4 py-2 rounded-full cursor-pointer transition-colors"
             >
               ✕ Close Zoom
             </button>
@@ -1224,19 +1360,6 @@ const SeekerDashboard = ({ user, profile, refreshMe }) => {
         </div>
       )}
 
-      <style dangerouslySetInnerHTML={{__html: `
-        .portfolio-thumb:hover .zoom-overlay {
-          opacity: 1 !important;
-        }
-        @media (max-width: 800px) {
-          .seeker-dashboard-grid {
-            grid-template-columns: 1fr !important;
-          }
-          .seeker-dashboard-grid > div {
-            position: static !important;
-          }
-        }
-      `}} />
     </div>
   );
 };

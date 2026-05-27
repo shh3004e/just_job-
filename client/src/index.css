@@ -1,6 +1,12 @@
-/* Core Design System & Global Styles for JJ Just Job */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600&display=swap');
+@import "tailwindcss";
 
+@theme {
+  --font-sans: "Inter", sans-serif;
+  --font-display: "Outfit", sans-serif;
+}
+
+/* Core Design System & Global Styles for JJ Just Job */
 :root {
   /* Color Tokens */
   --primary: #0a66c2;        /* Classic Tech Blue (LinkedIn core) */
@@ -57,7 +63,7 @@
 
 body {
   font-family: var(--font-family-sans);
-  background-color: var(--bg-main);
+  background-color: #f9fafb;
   color: var(--text-main);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -337,4 +343,29 @@ button, input, select, textarea {
   .btn, .form-control, .checkbox-label {
     min-height: 44px;
   }
+}
+
+/* Marquee Infinite Loop Keyframes */
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  display: flex;
+  width: max-content;
+  animation: marquee 30s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+.marquee-mask {
+  mask-image: linear-gradient(to right, transparent, white 20%, white 80%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, white 20%, white 80%, transparent);
 }

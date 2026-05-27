@@ -36,7 +36,11 @@ const mapProfileToMongoose = (profile) => {
     portfolioUrl: profile.website_link || '',
     languages: parseJsonField(profile.languages),
     relocate: profile.relocate || false,
-    createdAt: profile.created_at
+    createdAt: profile.created_at,
+    mobileNumber: profile.mobile_number || profile.mobileNumber || '',
+    joiningDate: profile.joining_date || profile.joiningDate || '',
+    experienceYears: profile.experience_years !== undefined ? Number(profile.experience_years) : (profile.experienceYears !== undefined ? Number(profile.experienceYears) : 0),
+    experienceMonths: profile.experience_months !== undefined ? Number(profile.experience_months) : (profile.experienceMonths !== undefined ? Number(profile.experienceMonths) : 0)
   };
 };
 
@@ -78,13 +82,14 @@ const findOneAndUpdate = async (query, updateData, options = {}) => {
        SET full_name = $1, position = $2, experience_type = $3, experience_value = $4, 
            skills = $5, tools = $6, gmail = $7, about_them = $8, schooling = $9, 
            resume_url = $10, photo_url = $11, work_samples = $12, portfolio_projects = $13, 
-           website_link = $14, languages = $15, relocate = $16
-       WHERE seeker_id = $17 RETURNING *`,
+           website_link = $14, languages = $15, relocate = $16,
+           mobile_number = $17, joining_date = $18, experience_years = $19, experience_months = $20
+       WHERE seeker_id = $21 RETURNING *`,
       [
         updateData.fullName,
         updateData.position,
-        updateData.experienceType,
-        Number(updateData.experienceValue),
+        updateData.experienceType || 'months',
+        Number(updateData.experienceValue || 0),
         updateData.skills || [],
         updateData.tools || [],
         updateData.gmail,
@@ -97,6 +102,10 @@ const findOneAndUpdate = async (query, updateData, options = {}) => {
         updateData.portfolioUrl || '',
         JSON.stringify(updateData.languages || []),
         updateData.relocate || false,
+        updateData.mobileNumber || '',
+        updateData.joiningDate || '',
+        Number(updateData.experienceYears || 0),
+        Number(updateData.experienceMonths || 0),
         userId
       ]
     );
@@ -106,14 +115,14 @@ const findOneAndUpdate = async (query, updateData, options = {}) => {
        (seeker_id, full_name, position, experience_type, experience_value, 
         skills, tools, gmail, about_them, schooling, 
         resume_url, photo_url, work_samples, portfolio_projects, 
-        website_link, languages, relocate)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING *`,
+        website_link, languages, relocate, mobile_number, joining_date, experience_years, experience_months)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21) RETURNING *`,
       [
         userId,
         updateData.fullName,
         updateData.position,
-        updateData.experienceType,
-        Number(updateData.experienceValue),
+        updateData.experienceType || 'months',
+        Number(updateData.experienceValue || 0),
         updateData.skills || [],
         updateData.tools || [],
         updateData.gmail,
@@ -125,7 +134,11 @@ const findOneAndUpdate = async (query, updateData, options = {}) => {
         JSON.stringify(updateData.portfolioProjects || []),
         updateData.portfolioUrl || '',
         JSON.stringify(updateData.languages || []),
-        updateData.relocate || false
+        updateData.relocate || false,
+        updateData.mobileNumber || '',
+        updateData.joiningDate || '',
+        Number(updateData.experienceYears || 0),
+        Number(updateData.experienceMonths || 0)
       ]
     );
   }

@@ -93,6 +93,12 @@ const initDb = async (pool) => {
       )
     `);
 
+    // Ensure new columns exist on job_seeker_profiles for updated fields
+    await client.query('ALTER TABLE job_seeker_profiles ADD COLUMN IF NOT EXISTS mobile_number VARCHAR(50)');
+    await client.query('ALTER TABLE job_seeker_profiles ADD COLUMN IF NOT EXISTS joining_date VARCHAR(50)');
+    await client.query('ALTER TABLE job_seeker_profiles ADD COLUMN IF NOT EXISTS experience_years INTEGER DEFAULT 0');
+    await client.query('ALTER TABLE job_seeker_profiles ADD COLUMN IF NOT EXISTS experience_months INTEGER DEFAULT 0');
+
     // Table 5: applications
     await client.query(`
       CREATE TABLE IF NOT EXISTS applications (

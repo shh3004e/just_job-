@@ -29,6 +29,12 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Incoming request logger middleware
+app.use((req, res, next) => {
+  console.log(`[HTTP] ${req.method} ${req.url} - Body:`, req.body);
+  next();
+});
+
 // Serve static uploaded files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
