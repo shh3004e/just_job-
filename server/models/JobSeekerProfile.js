@@ -40,7 +40,11 @@ const mapProfileToMongoose = (profile) => {
     mobileNumber: profile.mobile_number || profile.mobileNumber || '',
     joiningDate: profile.joining_date || profile.joiningDate || '',
     experienceYears: profile.experience_years !== undefined ? Number(profile.experience_years) : (profile.experienceYears !== undefined ? Number(profile.experienceYears) : 0),
-    experienceMonths: profile.experience_months !== undefined ? Number(profile.experience_months) : (profile.experienceMonths !== undefined ? Number(profile.experienceMonths) : 0)
+    experienceMonths: profile.experience_months !== undefined ? Number(profile.experience_months) : (profile.experienceMonths !== undefined ? Number(profile.experienceMonths) : 0),
+    school: profile.school || profile.schooling || '',
+    degree: profile.degree || '',
+    location: profile.location || '',
+    workMode: profile.work_mode || profile.workMode || 'Remote'
   };
 };
 
@@ -83,8 +87,9 @@ const findOneAndUpdate = async (query, updateData, options = {}) => {
            skills = $5, tools = $6, gmail = $7, about_them = $8, schooling = $9, 
            resume_url = $10, photo_url = $11, work_samples = $12, portfolio_projects = $13, 
            website_link = $14, languages = $15, relocate = $16,
-           mobile_number = $17, joining_date = $18, experience_years = $19, experience_months = $20
-       WHERE seeker_id = $21 RETURNING *`,
+           mobile_number = $17, joining_date = $18, experience_years = $19, experience_months = $20,
+           school = $21, degree = $22, location = $23, work_mode = $24
+       WHERE seeker_id = $25 RETURNING *`,
       [
         updateData.fullName,
         updateData.position,
@@ -94,7 +99,7 @@ const findOneAndUpdate = async (query, updateData, options = {}) => {
         updateData.tools || [],
         updateData.gmail,
         updateData.about_them || '',
-        updateData.schooling,
+        updateData.school || updateData.schooling || '',
         updateData.resumeUrl,
         updateData.photoUrl,
         updateData.workSamples || [],
@@ -106,6 +111,10 @@ const findOneAndUpdate = async (query, updateData, options = {}) => {
         updateData.joiningDate || '',
         Number(updateData.experienceYears || 0),
         Number(updateData.experienceMonths || 0),
+        updateData.school || '',
+        updateData.degree || '',
+        updateData.location || '',
+        updateData.workMode || 'Remote',
         userId
       ]
     );
@@ -115,8 +124,9 @@ const findOneAndUpdate = async (query, updateData, options = {}) => {
        (seeker_id, full_name, position, experience_type, experience_value, 
         skills, tools, gmail, about_them, schooling, 
         resume_url, photo_url, work_samples, portfolio_projects, 
-        website_link, languages, relocate, mobile_number, joining_date, experience_years, experience_months)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21) RETURNING *`,
+        website_link, languages, relocate, mobile_number, joining_date, experience_years, experience_months,
+        school, degree, location, work_mode)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25) RETURNING *`,
       [
         userId,
         updateData.fullName,
@@ -127,7 +137,7 @@ const findOneAndUpdate = async (query, updateData, options = {}) => {
         updateData.tools || [],
         updateData.gmail,
         updateData.about_them || '',
-        updateData.schooling,
+        updateData.school || updateData.schooling || '',
         updateData.resumeUrl,
         updateData.photoUrl,
         updateData.workSamples || [],
@@ -138,7 +148,11 @@ const findOneAndUpdate = async (query, updateData, options = {}) => {
         updateData.mobileNumber || '',
         updateData.joiningDate || '',
         Number(updateData.experienceYears || 0),
-        Number(updateData.experienceMonths || 0)
+        Number(updateData.experienceMonths || 0),
+        updateData.school || '',
+        updateData.degree || '',
+        updateData.location || '',
+        updateData.workMode || 'Remote'
       ]
     );
   }

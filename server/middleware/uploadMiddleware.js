@@ -25,9 +25,10 @@ const fileFilter = (req, file, cb) => {
     resume: /pdf/,
     photo: /jpeg|jpg/,
     workSamples: /jpeg|jpg|png|webp/,
-    projectFile0: /jpeg|jpg|png|webp|pdf|zip|doc|docx|rar|txt/,
-    projectFile1: /jpeg|jpg|png|webp|pdf|zip|doc|docx|rar|txt/,
-    projectFile2: /jpeg|jpg|png|webp|pdf|zip|doc|docx|rar|txt/
+    projectFile0: /jpeg|jpg|png|webp|pdf|zip|doc|docx|rar|txt|mp4|mov|avi|mkv/,
+    projectFile1: /jpeg|jpg|png|webp|pdf|zip|doc|docx|rar|txt|mp4|mov|avi|mkv/,
+    projectFile2: /jpeg|jpg|png|webp|pdf|zip|doc|docx|rar|txt|mp4|mov|avi|mkv/,
+    projectFile3: /jpeg|jpg|png|webp|pdf|zip|doc|docx|rar|txt|mp4|mov|avi|mkv/
   };
 
   const regex = filetypes[file.fieldname];
@@ -58,7 +59,7 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB limit per file
+    fileSize: 25 * 1024 * 1024 // 25MB limit per file
   },
   fileFilter: fileFilter
 });
@@ -70,7 +71,8 @@ const uploadProfileFiles = upload.fields([
   { name: 'workSamples', maxCount: 3 },
   { name: 'projectFile0', maxCount: 1 },
   { name: 'projectFile1', maxCount: 1 },
-  { name: 'projectFile2', maxCount: 1 }
+  { name: 'projectFile2', maxCount: 1 },
+  { name: 'projectFile3', maxCount: 1 }
 ]);
 
 module.exports = { uploadProfileFiles };

@@ -47,7 +47,11 @@ router.post('/profile', protect, authorize('seeker'), uploadProfileFiles, async 
       mobileNumber,
       joiningDate,
       experienceYears,
-      experienceMonths
+      experienceMonths,
+      school,
+      degree,
+      location,
+      workMode
     } = req.body;
 
     // Check if files exist (if this is a new profile, they are required)
@@ -65,7 +69,7 @@ router.post('/profile', protect, authorize('seeker'), uploadProfileFiles, async 
       });
     };
 
-    // Enforce size limits: photo <= 2MB, resume <= 1MB
+    // Enforce size limits: photo <= 2MB, resume <= 2MB
     if (files.photo && files.photo[0]) {
       const photoSize = fs.statSync(files.photo[0].path).size;
       if (photoSize > 2 * 1024 * 1024) {
@@ -76,9 +80,9 @@ router.post('/profile', protect, authorize('seeker'), uploadProfileFiles, async 
 
     if (files.resume && files.resume[0]) {
       const resumeSize = fs.statSync(files.resume[0].path).size;
-      if (resumeSize > 1 * 1024 * 1024) {
+      if (resumeSize > 2 * 1024 * 1024) { // Updated to 2MB!
         cleanupUploadedFiles(files);
-        return res.status(400).json({ success: false, message: 'Resume PDF must be under 1MB in size!' });
+        return res.status(400).json({ success: false, message: 'Resume PDF must be under 2MB in size!' });
       }
     }
 
@@ -125,8 +129,8 @@ router.post('/profile', protect, authorize('seeker'), uploadProfileFiles, async 
       }
     }
 
-    // Map uploaded project files
-    for (let i = 0; i < 3; i++) {
+    // Map uploaded project files (up to 4 projects)
+    for (let i = 0; i < 4; i++) {
       if (parsedPortfolioProjects[i]) {
         const fileKey = `projectFile${i}`;
         if (files[fileKey] && files[fileKey][0]) {
@@ -163,7 +167,7 @@ router.post('/profile', protect, authorize('seeker'), uploadProfileFiles, async 
       photoUrl,
       workSamples,
       portfolioUrl: portfolioUrl || '',
-      schooling,
+      schooling: school || schooling || '',
       workExperience: parsedWorkExperience,
       about_them,
       portfolioProjects: parsedPortfolioProjects,
@@ -171,7 +175,11 @@ router.post('/profile', protect, authorize('seeker'), uploadProfileFiles, async 
       mobileNumber: mobileNumber || '',
       joiningDate: joiningDate || '',
       experienceYears: Number(experienceYears || 0),
-      experienceMonths: Number(experienceMonths || 0)
+      experienceMonths: Number(experienceMonths || 0),
+      school: school || '',
+      degree: degree || '',
+      location: location || '',
+      workMode: workMode || 'Remote'
     };
 
     // Upsert profile

@@ -39,6 +39,10 @@ const SeekerDashboard = ({ user, profile, refreshMe, logout }) => {
   const [selectedTools, setSelectedTools] = useState([]);
   const [gmail, setGmail] = useState('');
   const [portfolioUrl, setPortfolioUrl] = useState('');
+  const [school, setSchool] = useState('');
+  const [degree, setDegree] = useState('');
+  const [location, setLocation] = useState('');
+  const [workMode, setWorkMode] = useState('Remote');
   const [schooling, setSchooling] = useState('');
   const [workExperience, setWorkExperience] = useState([]);
   const [aboutThem, setAboutThem] = useState('');
@@ -51,13 +55,14 @@ const SeekerDashboard = ({ user, profile, refreshMe, logout }) => {
   const [experienceYears, setExperienceYears] = useState(0);
   const [experienceMonths, setExperienceMonths] = useState(0);
 
-  // Up to 3 best projects
+  // Up to 4 best projects
   const [projects, setProjects] = useState([
-    { title: '', description: '', link: '', fileUrl: '' },
-    { title: '', description: '', link: '', fileUrl: '' },
-    { title: '', description: '', link: '', fileUrl: '' }
+    { title: '', description: '', link: '', fileUrl: '', videoLink: '' },
+    { title: '', description: '', link: '', fileUrl: '', videoLink: '' },
+    { title: '', description: '', link: '', fileUrl: '', videoLink: '' },
+    { title: '', description: '', link: '', fileUrl: '', videoLink: '' }
   ]);
-  const [projectFiles, setProjectFiles] = useState([null, null, null]);
+  const [projectFiles, setProjectFiles] = useState([null, null, null, null]);
 
   // Track Applications popup modal state
   const [showAppsModal, setShowAppsModal] = useState(false);
@@ -80,7 +85,9 @@ const SeekerDashboard = ({ user, profile, refreshMe, logout }) => {
     if (skillsStr.trim()) score += 10;
     if (selectedTools.length > 0) score += 10;
     if (languagesList.length > 0 && languagesList[0].language.trim()) score += 10;
-    if (schooling.trim()) score += 10;
+    if (school.trim() || schooling.trim()) score += 5;
+    if (degree.trim()) score += 5;
+    if (location.trim()) score += 10;
     if (aboutThem.trim()) score += 10;
     if (projects.filter(p => p.title.trim()).length > 0) score += 10;
     if (profile || resumeFile) score += 5;
@@ -109,6 +116,10 @@ const SeekerDashboard = ({ user, profile, refreshMe, logout }) => {
       setGmail(profile.gmail || '');
       setPortfolioUrl(profile.portfolioUrl || '');
       setSchooling(profile.schooling || '');
+      setSchool(profile.school || profile.schooling || '');
+      setDegree(profile.degree || '');
+      setLocation(profile.location || '');
+      setWorkMode(profile.workMode || 'Remote');
       setWorkExperience(profile.workExperience || []);
       setAboutThem(profile.about_them || profile.aboutThem || '');
       setRelocate(profile.relocate || false);
@@ -123,15 +134,16 @@ const SeekerDashboard = ({ user, profile, refreshMe, logout }) => {
       
       if (Array.isArray(profile.portfolioProjects) && profile.portfolioProjects.length > 0) {
         const mapped = [...profile.portfolioProjects];
-        while (mapped.length < 3) {
-          mapped.push({ title: '', description: '', link: '', fileUrl: '' });
+        while (mapped.length < 4) {
+          mapped.push({ title: '', description: '', link: '', fileUrl: '', videoLink: '' });
         }
-        setProjects(mapped.slice(0, 3));
+        setProjects(mapped.slice(0, 4));
       } else {
         setProjects([
-          { title: '', description: '', link: '', fileUrl: '' },
-          { title: '', description: '', link: '', fileUrl: '' },
-          { title: '', description: '', link: '', fileUrl: '' }
+          { title: '', description: '', link: '', fileUrl: '', videoLink: '' },
+          { title: '', description: '', link: '', fileUrl: '', videoLink: '' },
+          { title: '', description: '', link: '', fileUrl: '', videoLink: '' },
+          { title: '', description: '', link: '', fileUrl: '', videoLink: '' }
         ]);
       }
     } else {
@@ -142,14 +154,19 @@ const SeekerDashboard = ({ user, profile, refreshMe, logout }) => {
         setFullName(user.name || '');
       }
       setSchooling('');
+      setSchool('');
+      setDegree('');
+      setLocation('');
+      setWorkMode('Remote');
       setWorkExperience([]);
       setAboutThem('');
       setRelocate(false);
       setLanguagesList([{ language: 'English', fluency: 'Fluent' }]);
       setProjects([
-        { title: '', description: '', link: '', fileUrl: '' },
-        { title: '', description: '', link: '', fileUrl: '' },
-        { title: '', description: '', link: '', fileUrl: '' }
+        { title: '', description: '', link: '', fileUrl: '', videoLink: '' },
+        { title: '', description: '', link: '', fileUrl: '', videoLink: '' },
+        { title: '', description: '', link: '', fileUrl: '', videoLink: '' },
+        { title: '', description: '', link: '', fileUrl: '', videoLink: '' }
       ]);
     }
   }, [profile, user]);
@@ -243,8 +260,8 @@ const SeekerDashboard = ({ user, profile, refreshMe, logout }) => {
   const handleProjectFileChange = (idx, e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        setFormError(`Project #${idx + 1} file must be under 5MB.`);
+      if (file.size > 20 * 1024 * 1024) {
+        setFormError(`Project #${idx + 1} file must be under 20MB.`);
         return;
       }
       const updatedFiles = [...projectFiles];
@@ -298,8 +315,18 @@ const SeekerDashboard = ({ user, profile, refreshMe, logout }) => {
       return;
     }
 
-    if (!schooling.trim()) {
-      setFormError('Please add your schooling/education details.');
+    if (!school.trim()) {
+      setFormError('Please add your school/university name.');
+      return;
+    }
+
+    if (!degree.trim()) {
+      setFormError('Please add your degree or field of study.');
+      return;
+    }
+
+    if (!location.trim()) {
+      setFormError('Please specify your current location.');
       return;
     }
 
@@ -320,8 +347,8 @@ const SeekerDashboard = ({ user, profile, refreshMe, logout }) => {
     for (let i = 0; i < projects.length; i++) {
       const p = projects[i];
       if (p.title.trim()) {
-        if (!p.description.trim() || !p.link.trim()) {
-          setFormError(`Please complete all details (description and link) for Project #${i + 1}.`);
+        if (!p.description.trim() && !p.link.trim()) {
+          setFormError(`Please complete details (description and link) for Project #${i + 1}.`);
           return;
         }
       }
@@ -356,8 +383,8 @@ const SeekerDashboard = ({ user, profile, refreshMe, logout }) => {
     }
 
     if (resumeFile) {
-      if (resumeFile.size > 1 * 1024 * 1024) {
-        setFormError('Resume PDF must be less than 1MB in size!');
+      if (resumeFile.size > 2 * 1024 * 1024) {
+        setFormError('Resume PDF must be less than 2MB in size!');
         return;
       }
       if (!/\.pdf$/i.test(resumeFile.name)) {
@@ -375,7 +402,11 @@ const SeekerDashboard = ({ user, profile, refreshMe, logout }) => {
     formData.append('gmail', gmail);
     formData.append('languages', JSON.stringify(languagesList));
     formData.append('portfolioUrl', portfolioUrl);
-    formData.append('schooling', schooling);
+    formData.append('school', school);
+    formData.append('degree', degree);
+    formData.append('schooling', `${school} - ${degree}`);
+    formData.append('location', location);
+    formData.append('workMode', workMode);
     formData.append('workExperience', JSON.stringify(workExperience));
     formData.append('aboutThem', aboutThem);
     formData.append('portfolioProjects', JSON.stringify(projects));
@@ -399,6 +430,7 @@ const SeekerDashboard = ({ user, profile, refreshMe, logout }) => {
     if (projectFiles[0]) formData.append('projectFile0', projectFiles[0]);
     if (projectFiles[1]) formData.append('projectFile1', projectFiles[1]);
     if (projectFiles[2]) formData.append('projectFile2', projectFiles[2]);
+    if (projectFiles[3]) formData.append('projectFile3', projectFiles[3]);
 
     try {
       setFormLoading(true);
@@ -812,17 +844,55 @@ const SeekerDashboard = ({ user, profile, refreshMe, logout }) => {
                   />
                 </div>
 
-                {/* Education Schooling */}
-                <div className="flex flex-col md:col-span-2">
-                  <label className="text-[13px] font-semibold text-slate-700 mb-1.5">Schooling / Education Details</label>
-                  <textarea
+                {/* Education: School & Degree */}
+                <div className="flex flex-col">
+                  <label className="text-[13px] font-semibold text-slate-700 mb-1.5">School / College / University Name *</label>
+                  <input
+                    type="text"
                     required
-                    rows={2}
                     className="border border-slate-200 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:border-[#0a66c2] transition-colors"
-                    value={schooling}
-                    onChange={(e) => setSchooling(e.target.value)}
-                    placeholder="e.g. B.Des in UI/UX from National Institute of Design, Class of 2026"
+                    value={school}
+                    onChange={(e) => setSchool(e.target.value)}
+                    placeholder="e.g. National Institute of Design"
                   />
+                </div>
+
+                <div className="flex flex-col">
+                  <label className="text-[13px] font-semibold text-slate-700 mb-1.5">Degree / Field of Study *</label>
+                  <input
+                    type="text"
+                    required
+                    className="border border-slate-200 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:border-[#0a66c2] transition-colors"
+                    value={degree}
+                    onChange={(e) => setDegree(e.target.value)}
+                    placeholder="e.g. B.Des in UI/UX Design"
+                  />
+                </div>
+
+                {/* Location & Work Mode */}
+                <div className="flex flex-col">
+                  <label className="text-[13px] font-semibold text-slate-700 mb-1.5">Current Location (City, Country) *</label>
+                  <input
+                    type="text"
+                    required
+                    className="border border-slate-200 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:border-[#0a66c2] transition-colors"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder="e.g. Mumbai, India"
+                  />
+                </div>
+
+                <div className="flex flex-col">
+                  <label className="text-[13px] font-semibold text-slate-700 mb-1.5">Preferred Work Mode *</label>
+                  <select
+                    className="border border-slate-200 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:border-[#0a66c2] transition-colors bg-white"
+                    value={workMode}
+                    onChange={(e) => setWorkMode(e.target.value)}
+                  >
+                    <option value="Remote">Remote</option>
+                    <option value="Hybrid">Hybrid</option>
+                    <option value="On-site">On-site</option>
+                  </select>
                 </div>
 
                 {/* Relocation checkbox */}
@@ -884,10 +954,10 @@ const SeekerDashboard = ({ user, profile, refreshMe, logout }) => {
                   </div>
                 </div>
 
-                {/* Up to 3 best Projects with optional file uploads */}
+                {/* Up to 4 best Projects with optional file uploads */}
                 <div className="flex flex-col md:col-span-2 border-t border-slate-100 pt-6">
                   <h3 className="text-[15px] font-bold text-[#0a1b33] mb-4">
-                    Top 3 Best Projects (At least 1 required)
+                    Top 4 Best Projects (At least 1 required)
                   </h3>
                   <div className="space-y-4">
                     {projects.map((proj, idx) => (
@@ -919,20 +989,19 @@ const SeekerDashboard = ({ user, profile, refreshMe, logout }) => {
                             />
                           </div>
 
-                          <div className="flex flex-col md:col-span-2">
-                            <label className="text-[11px] font-semibold text-slate-500 mb-1">Project Description {idx === 0 && '*'}</label>
-                            <textarea
-                              required={idx === 0}
-                              rows={2}
+                          <div className="flex flex-col">
+                            <label className="text-[11px] font-semibold text-slate-500 mb-1">Project Video URL Link (Optional)</label>
+                            <input
+                              type="url"
                               className="border border-slate-200 rounded-xl px-3 py-2 text-[13px] focus:outline-none focus:border-[#0a66c2] bg-white"
-                              value={proj.description}
-                              onChange={(e) => handleProjectChange(idx, 'description', e.target.value)}
-                              placeholder="Explain your approach, tools and output..."
+                              value={proj.videoLink || ''}
+                              onChange={(e) => handleProjectChange(idx, 'videoLink', e.target.value)}
+                              placeholder="e.g. YouTube/Vimeo Demo Link"
                             />
                           </div>
 
                           {/* Optional project file upload */}
-                          <div className="flex flex-col md:col-span-2">
+                          <div className="flex flex-col">
                             <label className="text-[11px] font-semibold text-slate-500 mb-1">
                               Project Output File / Demo File (Optional)
                             </label>
@@ -953,8 +1022,20 @@ const SeekerDashboard = ({ user, profile, refreshMe, logout }) => {
                                 </a>
                               )}
                             </div>
-                            <small className="text-[10px] text-slate-400 mt-0.5">
-                              Upload PDF, images, or zip archive up to 5MB.
+                          </div>
+
+                          <div className="flex flex-col md:col-span-2">
+                            <label className="text-[11px] font-semibold text-slate-500 mb-1">Project Description {idx === 0 && '*'}</label>
+                            <textarea
+                              required={idx === 0}
+                              rows={2}
+                              className="border border-slate-200 rounded-xl px-3 py-2 text-[13px] focus:outline-none focus:border-[#0a66c2] bg-white"
+                              value={proj.description}
+                              onChange={(e) => handleProjectChange(idx, 'description', e.target.value)}
+                              placeholder="Explain your approach, tools and output..."
+                            />
+                            <small className="text-[10px] text-slate-400 mt-1">
+                              Upload PDF, images, or video file up to 20MB.
                             </small>
                           </div>
 
@@ -974,7 +1055,7 @@ const SeekerDashboard = ({ user, profile, refreshMe, logout }) => {
                     className="border border-slate-200 rounded-xl px-3 py-2 text-[13px]"
                     onChange={(e) => setResumeFile(e.target.files[0])}
                   />
-                  <small className="text-[11px] text-slate-400 mt-1">PDF format only. Max size 1MB.</small>
+                  <small className="text-[11px] text-slate-400 mt-1">PDF format only. Max size 2MB.</small>
                 </div>
 
                 <div className="flex flex-col border-t border-slate-100 pt-6">
@@ -1113,8 +1194,14 @@ const SeekerDashboard = ({ user, profile, refreshMe, logout }) => {
                   </div>
 
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Education Schooling</span>
-                    <p className="text-slate-600 font-medium">{profile.schooling}</p>
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Location & Work Mode</span>
+                    <p className="text-slate-600 font-semibold">{profile.location || 'Not provided'} ({profile.workMode || 'Remote'})</p>
+                  </div>
+
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Education School & Degree</span>
+                    <p className="text-slate-600 font-semibold">{profile.school || profile.schooling || 'Not specified'}</p>
+                    {profile.degree && <p className="text-[12px] text-slate-500 mt-0.5">{profile.degree}</p>}
                   </div>
 
                   <div className="flex items-center gap-2 pt-2">
@@ -1194,10 +1281,10 @@ const SeekerDashboard = ({ user, profile, refreshMe, logout }) => {
                 </div>
               </div>
 
-              {/* 3 Best Projects Grid */}
+              {/* 4 Best Projects Grid */}
               <div className="bg-white border border-slate-200/60 shadow-[0_10px_30px_rgba(0,0,0,0.02)] rounded-[32px] p-6">
                 <h3 className="text-[16px] font-display font-semibold text-[#0a1b33] mb-4 flex items-center gap-2">
-                  ✦ Top 3 Best Projects
+                  ✦ Top 4 Best Projects
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {profile.portfolioProjects && profile.portfolioProjects.filter(p => p.title.trim()).map((proj, idx) => (
@@ -1211,14 +1298,29 @@ const SeekerDashboard = ({ user, profile, refreshMe, logout }) => {
                       </div>
                       
                       <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-200/50">
-                        <a 
-                          href={proj.link} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          className="text-[12px] font-semibold text-[#0a66c2] hover:underline"
-                        >
-                          Website Link ↗
-                        </a>
+                        <div className="flex gap-3">
+                          {proj.link && (
+                            <a 
+                              href={proj.link} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="text-[12px] font-semibold text-[#0a66c2] hover:underline"
+                            >
+                              Website ↗
+                            </a>
+                          )}
+                          
+                          {proj.videoLink && (
+                            <a 
+                              href={proj.videoLink} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="text-[12px] font-semibold text-purple-600 hover:underline"
+                            >
+                              Video Demo ↗
+                            </a>
+                          )}
+                        </div>
                         
                         {proj.fileUrl && (
                           <a

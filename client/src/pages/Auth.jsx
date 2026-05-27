@@ -312,7 +312,12 @@ const Auth = ({ login, user }) => {
 
           const syncJson = await res.json();
           if (syncJson.success) {
-            login(data.session.access_token, syncJson.user);
+            // Sign out to clear temporary registration session from client
+            await supabase.auth.signOut();
+            setVerificationData(null);
+            setIsLoginTab(true);
+            setError('');
+            alert('Registration verified successfully! Please sign in with your email and password.');
           } else {
             throw new Error(syncJson.message || 'Failed to sync profile to database');
           }
@@ -336,7 +341,10 @@ const Auth = ({ login, user }) => {
 
         const json = await res.json();
         if (json.success) {
-          login(json.token, json.user);
+          setVerificationData(null);
+          setIsLoginTab(true);
+          setError('');
+          alert('Registration verified successfully! Please sign in with your email and password.');
         } else {
           setError(json.message || 'Verification failed');
         }
@@ -437,7 +445,9 @@ const Auth = ({ login, user }) => {
 
             const syncJson = await res.json();
             if (syncJson.success) {
-              login(data.session.access_token, syncJson.user);
+              await supabase.auth.signOut();
+              setIsLoginTab(true);
+              alert('Registration successful! Please sign in with your email and password.');
             } else {
               throw new Error(syncJson.message || 'Failed to initialize profile');
             }
